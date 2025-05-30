@@ -12,7 +12,7 @@ JUDGES = {
             AI assistant to the user question displayed below. Your evaluation should consider factors
             such as the helpfulness, relevance, accuracy, depth, creativity, and level of detail of
             the response. Begin your evaluation by providing a short explanation. Be as objective as
-            possible. After providing your explanation, please rate the response on a scale of 1 to 10.
+            possible. After providing your explanation, please rate the response on a scale of {scale_min} to {scale_max}.
             [Question]
             {input}
             [Expected Answer]
@@ -26,9 +26,9 @@ JUDGES = {
             """
             [System]
             Please act as an impartial judge and evaluate the correctness of the response provided by an
-            AI assistant to the user question displayed below. Your evaluation should consider the correctness
-            and the completeness with respect to the Expected Answer. Begin your evaluation by providing a short explanation. Be as objective as
-            possible. After providing your explanation, please rate the response on a scale of 1 to 10.
+            AI assistant to the user question displayed below. Your evaluation should only consider whether 
+            the correct information is contained in the answer. Begin your evaluation by providing a short explanation. Be as objective as
+            possible. After providing your explanation, please rate the response on a scale of {scale_min} to {scale_max}.
             [Question]
             {input}
             [Expected Answer]
@@ -47,7 +47,7 @@ JUDGES = {
             Your evaluation should consider whether the provided answer sounds like an appropriate response
             to the question, and whether it is written in a natural way. Disregard whether the answer is correct or not.
             Begin your evaluation by providing a short explanation. Be as objective as
-            possible. After providing your explanation, please rate the response on a scale of 1 to 10.
+            possible. After providing your explanation, please rate the response on a scale of {scale_min} to {scale_max}.
             [Question]
             {input}
             [The Start of Assistant's Answer]
@@ -62,11 +62,14 @@ class LLMJudgeResponse(BaseModel):
     raw_response: str
 
 class LLMJudge:
-    def __init__(self, judge_name: str, model_name: str, openai_client: FunctionType) -> None:
+    def __init__(self, judge_name: str, model_name: str, openai_client: FunctionType, temperature: float = 0.1, scale_min: int = 1, scale_max: int = 5) -> None:
         self.judge_name = judge_name
         self.judge_prompt = JUDGES[judge_name]
         self.model_name = model_name
         self.openai_client = openai_client
+        self.temperature = temperature
+        self.scale_min = scale_min
+        self.scale_max = scale_max
     
     def _format_response(self, rating: int, raw_response: str) -> Dict[str, Any]:
         """
@@ -79,18 +82,19 @@ class LLMJudge:
 
     def __call__(self, example: dict[str, Any]) -> Dict[str, Any]:
         """
-        Evaluates the quality of an AI response to a question using all the judges.
+        A wrapper for the judge that takes an example and returns a formatted response.
         """
         assert "question" in example, "Input must contain 'question' field."
         assert "answer" in example, "Output must contain 'answer' field."
         assert "answer_pred" in example, "Output must contain 'answer_pred' field. You must run QAEvaluator first."
-        return self._call_judge(
+        rating, raw_response = self._call_judge(
             input=example["question"],
             output=example["answer_pred"],
             expected=example["answer"]
         )
+        return self._format_response(rating=rating, raw_response=raw_response)
 
-    def _call_judge(self, input: str, output: str, expected: str) -> Dict[str, Any]:
+    def _call_judge(self, input: str, output: str, expected: str) -> tuple[int, str]:
         """
         Calls the judge with the provided input, output, and expected answer.
         """
@@ -98,16 +102,15 @@ class LLMJudge:
         unanswerable = (expected == "The answer is not found in the document.")
         unanswerable_correct = (output == "UNANSWERABLE")
         if unanswerable:
-            return self._format_response(
-                rating=10 if unanswerable_correct else 1,
-                raw_response="Unanswerable question."
-            )
+            return 10 if unanswerable_correct else 1, "Unanswerable question."
 
         # Call judge.
         judge_prompt = self.judge_prompt.format(
             input=input,
             expected=expected,
             output=output,
+            scale_min=self.scale_min,
+            scale_max=self.scale_max,
         )
         model_response = self.openai_client().beta.chat.completions.parse(
             messages=[
@@ -119,6 +122,7 @@ class LLMJudge:
             ],
             model=self.model_name,
             response_format=LLMJudgeResponse,
+            temperature=self.temperature,
         )
         raw_response = model_response.choices[0].message.content.strip()
 
@@ -127,7 +131,4 @@ class LLMJudge:
         except json.JSONDecodeError:
             print(f"Failed to parse JSON from response: {raw_response}")
         
-        return self._format_response(
-            rating=response_json.get("rating", 1),
-            raw_response=response_json.get("raw_response", raw_response)
-        )
+        return response_json.get("rating", 1), response_json.get("raw_response", raw_response)
