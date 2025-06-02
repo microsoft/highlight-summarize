@@ -110,6 +110,10 @@ class LLMJudge:
             )
 
         # Call judge.
+        class LLMRatingOutput(BaseModel):
+            rating: int
+            explanation: str
+
         judge_prompt = self.judge_prompt.format(
             input=input,
             expected=expected,
@@ -126,17 +130,11 @@ class LLMJudge:
                 {"role": "user", "content": judge_prompt},
             ],
             model=self.model_name,
-            response_format=LLMJudgeResponse,
+            response_format=LLMRatingOutput,
             temperature=self.temperature,
-        )
-        raw_response = model_response.choices[0].message.content.strip()
-
-        try:
-            response_json = json.loads(raw_response)
-        except json.JSONDecodeError:
-            print(f"Failed to parse JSON from response: {raw_response}")
-
+        ).choices[0].message.parsed
+        
         return LLMJudgeResponse(
-            rating=response_json.get("rating", None),
-            raw_response=raw_response
+            rating=model_response.rating if hasattr(model_response, 'rating') else None,
+            raw_response=model_response.explanation if hasattr(model_response, 'explanation') else model_response
         )
