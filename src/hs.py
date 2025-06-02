@@ -182,17 +182,23 @@ class HSStructuredHighlighter(HSBaseline):
             answer: str
             text_extracts: list[str]
 
-        model_response = self.openai_client().beta.chat.completions.parse(
-            messages=[
-                {"role": "user", "content": self.extractor_prompt.format(
-                    context=context_str,
-                    question_str=question_str,
-                )}
-            ],
-            temperature=self.temperature,
-            model=self.model_name,
-            response_format=LLMOutput,
-        ).choices[0].message.parsed
+        try:
+            model_response = self.openai_client().beta.chat.completions.parse(
+                messages=[
+                    {"role": "user", "content": self.extractor_prompt.format(
+                        context=context_str,
+                        question_str=question_str,
+                    )}
+                ],
+                temperature=self.temperature,
+                model=self.model_name,
+                response_format=LLMOutput,
+            ).choices[0].message.parsed
+        except Exception as e:
+            print(f"Error in call_highlighter: {e}")
+            return HighlighterOutput(
+                highlighter_llm_response=f"Error: {e}"
+            )
 
         # Nothing to highlight.
         if not model_response.answer or NOANSWER_PRED in model_response.answer:
