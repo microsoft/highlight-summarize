@@ -6,6 +6,26 @@ from pydantic import BaseModel
 from .qa import QAEvaluator, QAPrediction
 from .utils import NOANSWER_PRED, FAILED_PRED
 
+BASELINE_EXTRACTOR_PROMPT = dedent(
+    "You are an expert research assistant."
+    "You are given a context text and a question about it. Your task is to extract information from the context "
+    "text that answers the question. If there is no information in the context that answers the question, "
+    f"you must output a special token that indicates that the question is unanswerable: '{NOANSWER_PRED}'.\n"
+    "If the answer is contained in parts of the text, you will output the relevant text extract(s), by prefixing each "
+    "extract with a bullet point '-', and nothing else."
+    "Context:\n"
+    "{context}\n"
+    "Question: {question_str}?\n"
+)
+BASELINE_SUMMARIZER_PROMPT = dedent(
+    """You are given highlighted text from a document; the text extract is relevant to some
+    question which you don't know. Figure out what question the text extract is trying
+    to answer, and summarize the text extract in a concise manner in the form of an answer.
+    Text extract:
+    {text_extract}
+    """
+)
+
 class HighlighterOutput(BaseModel):
     highlighter_extracted: str | None = None
     highlighter_llm_response: str | None = None
@@ -34,6 +54,8 @@ class HSBaseline(QAEvaluator):
         n_trials: int = 1,
         sleep_time_between_retrials: float = 1.0,
         max_sleep_time_between_retrials: float = 600.0,
+        extractor_prompt: str = BASELINE_EXTRACTOR_PROMPT,
+        summarizer_prompt: str = BASELINE_SUMMARIZER_PROMPT,
     ) -> None:
         super().__init__(
             model_name=model_name,
@@ -44,24 +66,8 @@ class HSBaseline(QAEvaluator):
             max_sleep_time_between_retrials=max_sleep_time_between_retrials,
         )
         
-        self.extractor_prompt = dedent(
-            "You are an expert research assistant."
-            "You are given a context text and a question about it. Your task is to extract information from the context "
-            "text that answers the question. If there is no information in the context that answers the question, "
-            f"you must output a special token that indicates that the question is unanswerable: '{NOANSWER_PRED}'.\n"
-            "If the answer is contained in parts of the text, you will output the relevant text extract(s), by prefixing each "
-            "extract with a bullet point '-', and nothing else."
-            "Context:\n"
-            "{context}\n"
-            "Question: {question_str}?\n"
-            )
-        self.summarizer_prompt = dedent(
-            """You are given highlighted text from a document; the text extract is relevant to some
-            question which you don't know. Figure out what question the text extract is trying
-            to answer, and summarize the text extract in a concise manner in the form of an answer.
-            Text extract:
-            {text_extract}
-            """)
+        self.extractor_prompt = extractor_prompt
+        self.summarizer_prompt = summarizer_prompt
 
     def call_model(self, context_str: str, question_str: str) -> HSBaselinePrediction:
         highlighted = self.call_highlighter(context_str, question_str)
