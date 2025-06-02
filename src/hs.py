@@ -46,11 +46,11 @@ class HSBaseline(QAEvaluator):
         
         self.extractor_prompt = dedent(
             "You are an expert research assistant."
-            "You are tasked with highlighting relevant text extract(s) from a context text."
-            "Your output must be (verbatim) a list of the text extract(s) that answer the question."
-            "You will output the text extract(s), by prefixing each extract with a bullet point '-',"
-            "and nothing else."
-            f"Important: if no part of the text answers the question, you must output '{NOANSWER_PRED}'.\n"
+            "You are given a context text and a question about it. Your task is to extract information from the context "
+            "text that answers the question. If there is no information in the context that answers the question, "
+            f"you must output a special token that indicates that the question is unanswerable: '{NOANSWER_PRED}'.\n"
+            "If the answer is contained in parts of the text, you will output the relevant text extract(s), by prefixing each "
+            "extract with a bullet point '-', and nothing else."
             "Context:\n"
             "{context}\n"
             "Question: {question_str}?\n"
