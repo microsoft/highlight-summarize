@@ -13,7 +13,7 @@ class HighlighterOutput(BaseModel):
     highlighter_fuzzmatch_scores: list[float] | None = None
 
 class SummarizerOutput(BaseModel):
-    anser_pred: str | None = None
+    answer_pred: str | None = None
     summarizer_llm_response: str | None = None
     summarizer_llm_guessed_question: str | None = None
 
@@ -98,11 +98,11 @@ class HSBaseline(QAEvaluator):
         if not model_response.choices or not model_response.choices[0].message.content:
             return HighlighterOutput()
         content = model_response.choices[0].message.content
+        # Nothing to highlight.
+        if NOANSWER_PRED in content:
+            return HighlighterOutput(highlighter_llm_response=content)
         # Malformed output.
         if not content.strip().startswith("- "):
-            return HighlighterOutput(highlighter_llm_response=content)
-        # Nothing to highlight.
-        if NOANSWER_PRED in text_extracts:
             return HighlighterOutput(highlighter_llm_response=content)
         # Extract the text extract(s) from the response.
         text_extracts = content.strip().split("\n")
@@ -146,6 +146,6 @@ class HSBaseline(QAEvaluator):
         return SummarizerOutput(
             # Failed prediction if the LLM gives no answer.
             answer_pred=raw_response.answer if hasattr(raw_response, "answer") else FAILED_PRED,
-            summarizer_llm_response=raw_response,
+            summarizer_llm_response=str(raw_response),
             summarizer_llm_guessed_question=raw_response.guessed_question if hasattr(raw_response, "guessed_question") else None,
         )

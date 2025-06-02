@@ -100,7 +100,7 @@ class QAEvaluator:
     def __call__(self, example: dict[str, Any]) -> dict[str, Any]:
         if "document_extracted" in example:
             context_str = example["document_extracted"]
-        elif "entity_pages":
+        elif "entity_pages" in example:
             context_str = ("\n\n").join(example["entity_pages"]["wiki_context"])
         else:
             raise ValueError("Unknown data format. Can't read 'context' or 'entity_pages' fields.")
