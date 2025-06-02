@@ -1,12 +1,14 @@
 import os
+from typing import Literal
 from openai import AzureOpenAI
 from dotenv import load_dotenv
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
+# COMMON.
+NOANSWER_PRED = "UNANSWERABLE"
+FAILED_PRED = "FAILED"
+
 load_dotenv()
-
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-
 endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
 
 # We initialize every time to make the most of HF's caching.
