@@ -61,7 +61,7 @@ JUDGES = {
 
 class LLMJudgeResponse(BaseModel):
     rating: int
-    raw_response: str
+    explanation: str
 
 class LLMJudge:
     def __init__(self, judge_name: str, openai_client: FunctionType, model_name: str = "gpt-4.1-mini", temperature: float = 0.1, scale_min: int = 1, scale_max: int = 5) -> None:
@@ -72,15 +72,6 @@ class LLMJudge:
         self.temperature = temperature
         self.scale_min = scale_min
         self.scale_max = scale_max
-    
-    def _format_response(self, rating: int, raw_response: str) -> Dict[str, Any]:
-        """
-        Formats the response from the judge into a dictionary.
-        """
-        return {
-            f"{self.judge_name}-rating": rating,
-            f"{self.judge_name}-raw_response": raw_response
-        }
 
     def __call__(self, example: dict[str, Any]) -> Dict[str, Any]:
         """
@@ -89,12 +80,16 @@ class LLMJudge:
         assert "question" in example, "Input must contain 'question' field."
         assert "answer" in example, "Output must contain 'answer' field."
         assert "answer_pred" in example, "Output must contain 'answer_pred' field. You must run QAEvaluator first."
-        rating, raw_response = self._call_judge(
+        judgement = self._call_judge(
             input=example["question"],
             output=example["answer_pred"],
             expected=example["answer"]
         )
-        return self._format_response(rating=rating, raw_response=raw_response)
+
+        return {
+            f"{self.judge_name}_rating": judgement.rating,
+            f"{self.judge_name}_explanation": judgement.explanation,
+        }
 
     def _call_judge(self, input: str, output: str, expected: str) -> LLMJudgeResponse:
         """
@@ -106,7 +101,7 @@ class LLMJudge:
         if unanswerable:
             return LLMJudgeResponse(
                 rating=self.scale_max if unanswerable_correct else self.scale_min,
-                raw_response=NOANSWER_PRED
+                explanation=NOANSWER_PRED
             )
 
         # Call judge.
@@ -136,5 +131,5 @@ class LLMJudge:
         
         return LLMJudgeResponse(
             rating=model_response.rating if hasattr(model_response, 'rating') else None,
-            raw_response=model_response.explanation if hasattr(model_response, 'explanation') else model_response
+            explanation=model_response.explanation if hasattr(model_response, 'explanation') else model_response
         )
