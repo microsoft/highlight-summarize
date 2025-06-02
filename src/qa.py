@@ -4,13 +4,27 @@ import time
 import json
 import requests
 from typing import Any
+from pydantic import BaseModel
+
+from .utils import NOANSWER_PRED, FAILED_PRED
+
+
+class QAPrediction(BaseModel):
+    """The prediction returned from a Q&A pipeline.
+    """
+    answer_pred: str
+    # Model metadata.
+    model_name: str | None = None
+    temperature: float | None = None
+    # Prediction metadata (can be augmented).
+    llm_response: str | None = None
 
 class QAEvaluator:
     def __init__(
         self,
         model_name: str,
         openai_client,
-        temperature: float = 0.3,
+        temperature: float = 0.2,
         n_trials: int = 1,
         sleep_time_between_retrials: float = 1.0,
         max_sleep_time_between_retrials: float = 600.0,
@@ -32,8 +46,11 @@ class QAEvaluator:
             "Answer directly and do not prefix the answer with anything such as 'Answer:' nor 'The answer is:'. "
             "The answer has to be the only output you explicitly provide. "
             "The answer has to be as short, direct, and concise as possible. "
-            "If the answer to the question can not be obtained from the provided context paragraph, output 'UNANSWERABLE'. "
+            f"If the answer to the question can not be obtained from the provided context paragraph, output '{NOANSWER_PRED}'. "
             "Here's the context and question for you to reason about and answer:\n"
+            "Context:\n"
+            "{context}\n"
+            "Question: {question_str}?\n"
         )
 
         self.n_trials = n_trials
@@ -43,7 +60,7 @@ class QAEvaluator:
         self.model_name = model_name
         self.temperature = temperature
 
-    def call_model(self, context_str: str, question_str: str) -> tuple[str, dict[str, Any]]:
+    def call_model(self, context_str: str, question_str: str) -> QAPrediction:
         """Uses the LLM to answer the question based on the context provided.
         
         Args:
@@ -53,8 +70,9 @@ class QAEvaluator:
             tuple[str, dict[str, Any]]: A tuple containing the answer as well as any other metadata.
         """
         system_prompt_str = self._base_system_prompt
-        user_prompt_str = (
-            self._base_user_prompt + f"Context: {context_str}\nQuestion: {question_str}?\n"
+        user_prompt_str = self._base_user_prompt.format(
+                context=context_str,
+                question_str=question_str,
         )
         model_response = self.openai_client().chat.completions.create(
                     messages=[
@@ -68,12 +86,16 @@ class QAEvaluator:
                     model=self.model_name,
                 )
 
-        raw_response = model_response.choices[0].message.content
-        if not raw_response:
-            return "UNANSWERABLE", {"raw_response": raw_response}
-        answer = raw_response.split(":")[-1].strip()
+        llm_response = model_response.choices[0].message.content
+        if not llm_response:
+            return QAPrediction(answer_pred=FAILED_PRED, llm_response=llm_response)
 
-        return answer, {"raw_response": raw_response}
+        return QAPrediction(
+            answer_pred=llm_response.split(":")[-1].strip(),
+            llm_response=llm_response,
+            model_name=self.model_name,
+            temperature=self.temperature,
+        )
 
     def __call__(self, example: dict[str, Any]) -> dict[str, Any]:
         if "document_extracted" in example:
@@ -86,7 +108,7 @@ class QAEvaluator:
         
         for trial in range(self.n_trials):
             try:
-                answer, answer_metadata = self.call_model(context_str, question_str)
+                prediction = self.call_model(context_str, question_str)
                 break
             except (
                 KeyError,
@@ -96,19 +118,11 @@ class QAEvaluator:
                 requests.exceptions.ChunkedEncodingError,
             ) as e:
                 print(f"Trial: {trial}: {e}")
-                answer = None
-                answer_metadata = {}
+                prediction = QAPrediction(answer_pred="")
                 sleep_time = min(
                     self.max_sleep_time_between_retrials,
                     self.sleep_time_between_retrials * (2 ** (trial + 1)),
                 )
                 time.sleep(sleep_time)
 
-        res = {
-            "answer_pred": answer,
-            "model_name": self.model_name,
-            "temperature": self.temperature,
-        }
-        res.update(answer_metadata)
-
-        return res
+        return prediction.model_dump()
