@@ -155,3 +155,65 @@ class HSBaseline(QAEvaluator):
             summarizer_llm_response=str(raw_response),
             summarizer_llm_guessed_question=raw_response.guessed_question if hasattr(raw_response, "guessed_question") else None,
         )
+
+class HSStructuredHighlighter(HSBaseline):
+    """Highlighter that uses structured output.
+    """
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.extractor_prompt = dedent(
+            "I'd like for you to answer questions about a context text that will be provided."
+            "I'll give you a pair with the form:\nContext: 'context text'\nQuestion: 'a question about the context'.\n"
+            "First, tell me about your knowledge of the context and what information it contains, "
+            "then, create an analysis of the context strictly using information contained in the text provided. "
+            "If there is no information in the context that answers the question, "
+            f"your answer _must_ be exactly '{NOANSWER_PRED}'.\n"
+            "If the question can be answered, you must return the `answer` together with "
+            "a list of text extracts (`text_extracts`) that allowed you to answer the question."
+            "Here's the context and question for you to reason about and answer:\n"
+            "Context:\n"
+            "{context}\n"
+            "Question: {question_str}?\n"
+        )
+ 
+    def call_highlighter(self, context_str: str, question_str: str) -> HighlighterOutput:
+        """This highlither uses structured output to extract text from the context."""
+        class LLMOutput(BaseModel):
+            answer: str
+            text_extracts: list[str]
+
+        model_response = self.openai_client().beta.chat.completions.parse(
+            messages=[
+                {"role": "user", "content": self.extractor_prompt.format(
+                    context=context_str,
+                    question_str=question_str,
+                )}
+            ],
+            temperature=self.temperature,
+            model=self.model_name,
+            response_format=LLMOutput,
+        ).choices[0].message.parsed
+
+        # Nothing to highlight.
+        if not model_response.answer or NOANSWER_PRED in model_response.answer:
+            return HighlighterOutput(highlighter_llm_response=str(model_response))
+        
+        if not model_response.text_extracts:
+            return HighlighterOutput(highlighter_llm_response=str(model_response))
+        
+        # Check if the text extracts are in the context.
+        valid_text_extracts = []
+        scores = []
+        for text_extract in model_response.text_extracts:
+            scores.append(fuzz.partial_ratio(text_extract, context_str))
+            if scores[-1] >= 95:
+                valid_text_extracts.append(text_extract)
+        
+        valid_text = "\n".join(valid_text_extracts)
+
+        return HighlighterOutput(
+            highlighter_extracted=valid_text.strip(),
+            highlighter_llm_response=model_response.answer,
+            highlighter_text_extracts=model_response.text_extracts,
+            highlighter_fuzzmatch_scores=scores,
+        )
