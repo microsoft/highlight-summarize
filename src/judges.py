@@ -4,6 +4,8 @@ from typing import Dict, Any
 from pydantic import BaseModel
 from types import FunctionType
 
+from .utils import NOANSWER_PRED
+
 JUDGES = {
     "MT-bench-QA": dedent(
             """
@@ -62,7 +64,7 @@ class LLMJudgeResponse(BaseModel):
     raw_response: str
 
 class LLMJudge:
-    def __init__(self, judge_name: str, model_name: str, openai_client: FunctionType, temperature: float = 0.1, scale_min: int = 1, scale_max: int = 5) -> None:
+    def __init__(self, judge_name: str, openai_client: FunctionType, model_name: str = "gpt-4.1-mini", temperature: float = 0.1, scale_min: int = 1, scale_max: int = 5) -> None:
         self.judge_name = judge_name
         self.judge_prompt = JUDGES[judge_name]
         self.model_name = model_name
@@ -94,15 +96,18 @@ class LLMJudge:
         )
         return self._format_response(rating=rating, raw_response=raw_response)
 
-    def _call_judge(self, input: str, output: str, expected: str) -> tuple[int, str]:
+    def _call_judge(self, input: str, output: str, expected: str) -> LLMJudgeResponse:
         """
         Calls the judge with the provided input, output, and expected answer.
         """
         # Check if unanswerable.
-        unanswerable = (expected == "The answer is not found in the document.")
-        unanswerable_correct = (output == "UNANSWERABLE")
+        unanswerable = (expected == NOANSWER_PRED)
+        unanswerable_correct = (output == NOANSWER_PRED)
         if unanswerable:
-            return 10 if unanswerable_correct else 1, "Unanswerable question."
+            return LLMJudgeResponse(
+                rating=self.scale_max if unanswerable_correct else self.scale_min,
+                raw_response=NOANSWER_PRED
+            )
 
         # Call judge.
         judge_prompt = self.judge_prompt.format(
@@ -130,5 +135,8 @@ class LLMJudge:
             response_json = json.loads(raw_response)
         except json.JSONDecodeError:
             print(f"Failed to parse JSON from response: {raw_response}")
-        
-        return response_json.get("rating", 1), response_json.get("raw_response", raw_response)
+
+        return LLMJudgeResponse(
+            rating=response_json.get("rating", None),
+            raw_response=raw_response
+        )
