@@ -64,7 +64,7 @@ class LLMJudgeResponse(BaseModel):
     explanation: str
 
 class LLMJudge:
-    def __init__(self, judge_name: str, openai_client: FunctionType, model_name: str = "gpt-4.1-mini", temperature: float = 0.1, scale_min: int = 1, scale_max: int = 5) -> None:
+    def __init__(self, judge_name: str, openai_client: FunctionType, model_name: str = "gpt-4.1-mini", temperature: float = 0, scale_min: int = 1, scale_max: int = 5) -> None:
         self.judge_name = judge_name
         self.judge_prompt = JUDGES[judge_name]
         self.model_name = model_name
@@ -80,6 +80,16 @@ class LLMJudge:
         assert "question" in example, "Input must contain 'question' field."
         assert "answer" in example, "Output must contain 'answer' field."
         assert "answer_pred" in example, "Output must contain 'answer_pred' field. You must run QAEvaluator first."
+
+        # Check if unanswerable.
+        unanswerable = (example["answer"] == NOANSWER_PRED)
+        unanswerable_correct = (example["answer_pred"] == NOANSWER_PRED)
+        if unanswerable:
+            return {
+                f"{self.judge_name}_rating": self.scale_max if unanswerable_correct else self.scale_min,
+                f"{self.judge_name}_explanation": NOANSWER_PRED
+            }
+
         judgement = self._call_judge(
             input=example["question"],
             output=example["answer_pred"],
@@ -95,16 +105,6 @@ class LLMJudge:
         """
         Calls the judge with the provided input, output, and expected answer.
         """
-        # Check if unanswerable.
-        unanswerable = (expected == NOANSWER_PRED)
-        unanswerable_correct = (output == NOANSWER_PRED)
-        if unanswerable:
-            return LLMJudgeResponse(
-                rating=self.scale_max if unanswerable_correct else self.scale_min,
-                explanation=NOANSWER_PRED
-            )
-
-        # Call judge.
         class LLMRatingOutput(BaseModel):
             rating: int
             explanation: str
