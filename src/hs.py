@@ -2,6 +2,8 @@ from rapidfuzz import fuzz
 from textwrap import dedent
 from types import FunctionType
 from pydantic import BaseModel
+from transformers import pipeline
+from text_chunker import sentences
 
 from .qa import QAEvaluator, QAPrediction
 from .utils import NOANSWER_PRED, FAILED_PRED
@@ -31,6 +33,7 @@ class HighlighterOutput(BaseModel):
     highlighter_llm_response: str | None = None
     highlighter_text_extracts: list[str] | None = None
     highlighter_fuzzmatch_scores: list[float] | None = None
+    highlighter_score: float | None = None
 
 class SummarizerOutput(BaseModel):
     answer_pred: str | None = None
@@ -222,4 +225,51 @@ class HSStructuredHighlighter(HSBaseline):
             highlighter_llm_response=model_response.answer,
             highlighter_text_extracts=model_response.text_extracts,
             highlighter_fuzzmatch_scores=scores,
+        )
+
+class HSBERTExtractor(HSBaseline):
+    """Highlighter that uses a BERT-based extractor.
+    """
+    def __init__(self, highlighter_threshold=0.5, highlighter_model='distilbert-base-cased-distilled-squad', *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.extractor = pipeline("question-answering", model=highlighter_model)
+        self.highlighter_threshold = highlighter_threshold
+        # In case this hasn't been downloaded yet.
+        import nltk
+        nltk.download('punkt_tab')
+
+    def call_highlighter(self, context_str: str, question_str: str) -> HighlighterOutput:
+        """This highlighter uses a BERT-based extractor to extract text from the context."""
+        try:
+            model_response = self.extractor(
+                question=question_str,
+                context=context_str,
+            )
+        except Exception as e:
+            print(f"Error in call_highlighter: {e}")
+            return HighlighterOutput(
+                highlighter_llm_response=f"Error: {e}"
+            )
+
+        # Nothing to highlight.
+        if model_response['score'] < self.highlighter_threshold:
+            return HighlighterOutput(
+                highlighter_extracted=None,
+                highlighter_score=model_response['score'],
+                highlighter_llm_response=model_response['answer'],
+            )
+
+        # We return the full sentence that contains the answer.
+        context = context_str.replace("\n", " ")
+        for s in sentences(context):
+            if s in context[model_response["start"]:]:
+                extracted_sentence = s
+                break
+        else:
+            raise ValueError("No sentence found containing the answer. This looks like a logical error in the code.")
+
+        return HighlighterOutput(
+            highlighter_extracted=extracted_sentence.strip(),
+            highlighter_score=model_response['score'],
+            highlighter_llm_response=model_response['answer'],
         )
