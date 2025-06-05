@@ -6,3 +6,15 @@ numpy
 scikit-learn
 judges
 dotenv
+torch
+torchvision
+torchaudio
+transformers[torch]
+evaluate
+rapidfuzz
+seaborn
+matplotlib
+azure-identity
+openpyxl
+tiktoken
+sentencepiece
