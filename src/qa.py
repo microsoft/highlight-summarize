@@ -103,7 +103,7 @@ class QAEvaluator:
         elif "entity_pages" in example:
             context_str = ("\n\n").join(example["entity_pages"]["wiki_context"])
         else:
-            raise ValueError("Unknown data format. Can't read 'context' or 'entity_pages' fields.")
+            raise ValueError("Unknown data format. Can't read 'document_extracted' or 'entity_pages' fields.")
         question_str = example["question"]
         
         for trial in range(self.n_trials):
