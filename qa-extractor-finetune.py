@@ -18,7 +18,7 @@ def run(model_name):
     tokenizer = AutoTokenizer.from_pretrained(model_name)
 
     # Preprocess the RepliQA dataset.
-    NOANSWER = "The answer is not found in the document."
+    NOANSWER = "UNANSWERABLE"
     repliqa_splits = [load_repliqa(split=i) for i in range(3)] # We exclude the test set (split 3).
     repliqa = concatenate_datasets(repliqa_splits)
 
@@ -29,6 +29,7 @@ def run(model_name):
         
     repliqa_filtered = repliqa.filter(filter_bad_answers)
     print(f"Filtered dataset size: {len(repliqa_filtered)}")
+    print(f"Unanswerable examples: {len(repliqa_filtered.filter(lambda x: x['answer'] == NOANSWER))}")
 
     def preprocess_function(examples):
         questions = [q.strip() for q in examples["question"]]
@@ -43,7 +44,8 @@ def run(model_name):
         )
 
         offset_mapping = inputs.pop("offset_mapping")
-        answers = examples["long_answer"]
+        answers = examples["answer"]
+        long_answers = examples["long_answer"]
         docs = examples["document_extracted"]
         start_positions = []
         end_positions = []
@@ -54,13 +56,13 @@ def run(model_name):
                 end_positions.append(0)
                 continue
 
-            answer = answers[i].lower()
+            long_answer = long_answers[i].lower()
             doc = docs[i].lower()
             sequence_ids = inputs.sequence_ids(i)
 
-            start_char = doc.find(answer)
+            start_char = doc.find(long_answer)
             if start_char != -1:
-                end_char = start_char + len(answer)
+                end_char = start_char + len(long_answer)
 
                 # Find the start and end of the context.
                 idx = 0
@@ -73,7 +75,7 @@ def run(model_name):
 
                 # If the answer is not fully inside the context.
                 if offset[context_start][0] > end_char or offset[context_end][1] < start_char:
-                    print(f"Answer: {answer}.")
+                    print(f"Answer: {long_answer}.")
                     print(f"Document: {doc}.")
                     print(f"Context start: {context_start}, end: {context_end}.")
                     print(f"Offset: {offset}.")
@@ -96,13 +98,14 @@ def run(model_name):
                     "This shouldn't happen: you must filter out "
                     "`long_answer`s that aren't exactly in the "
                     "context document.\n"
-                    f" Answer: {answer}.\nDocument: {doc}"
+                    f" Answer: {long_answer}.\nDocument: {doc}"
                 )
 
         inputs["start_positions"] = start_positions
         inputs["end_positions"] = end_positions
         return inputs
 
+    # Tokenize the dataset.
     tokenized_repliqa = repliqa_filtered.map(preprocess_function, batched=True)
 
     # Train-test split.
