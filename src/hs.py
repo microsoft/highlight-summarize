@@ -43,7 +43,8 @@ class SummarizerOutput(BaseModel):
 class HSBaselinePrediction(QAPrediction, HighlighterOutput, SummarizerOutput):
     """Prediction made by the H&S pipeline.
     """
-    pass
+    highlighter_model_name: str | None = None
+    summarizer_model_name: str | None = None
 
 
 class HSBaseline(QAEvaluator):
@@ -51,7 +52,8 @@ class HSBaseline(QAEvaluator):
     """
     def __init__(
         self,
-        model_name: str,
+        highlighter_model_name: str,
+        summarizer_model_name: str,
         openai_client: FunctionType,
         temperature: float = 0.3,
         n_trials: int = 1,
@@ -61,7 +63,7 @@ class HSBaseline(QAEvaluator):
         summarizer_prompt: str = BASELINE_SUMMARIZER_PROMPT,
     ) -> None:
         super().__init__(
-            model_name=model_name,
+            model_name=None,
             openai_client=openai_client,
             temperature=temperature,
             n_trials=n_trials,
@@ -71,6 +73,8 @@ class HSBaseline(QAEvaluator):
         
         self.extractor_prompt = extractor_prompt
         self.summarizer_prompt = summarizer_prompt
+        self.highlighter_model_name = highlighter_model_name
+        self.summarizer_model_name = summarizer_model_name
 
     def call_model(self, context_str: str, question_str: str) -> HSBaselinePrediction:
         highlighted = self.call_highlighter(context_str, question_str)
@@ -87,7 +91,8 @@ class HSBaseline(QAEvaluator):
         return HSBaselinePrediction(
             **highlighted.model_dump(),
             **summarized.model_dump(),
-            model_name=self.model_name,
+            highlighter_model_name=self.highlighter_model_name,
+            summarizer_model_name=self.summarizer_model_name,
             temperature=self.temperature,
         )
         
@@ -100,7 +105,7 @@ class HSBaseline(QAEvaluator):
                 )}
             ],
             temperature=self.temperature,
-            model=self.model_name,
+            model=self.highlighter_model_name,
         )
 
         # No response.
@@ -148,7 +153,7 @@ class HSBaseline(QAEvaluator):
                 )}
             ],
             temperature=self.temperature,
-            model=self.model_name,
+            model=self.summarizer_model_name,
             response_format=LLMSummarizerOutput,
         ).choices[0].message.parsed
 
@@ -194,7 +199,7 @@ class HSStructuredHighlighter(HSBaseline):
                     )}
                 ],
                 temperature=self.temperature,
-                model=self.model_name,
+                model=self.highlighter_model_name,
                 response_format=LLMOutput,
             ).choices[0].message.parsed
         except Exception as e:
@@ -230,13 +235,19 @@ class HSStructuredHighlighter(HSBaseline):
 class HSBERTExtractor(HSBaseline):
     """Highlighter that uses a BERT-based extractor.
     """
-    def __init__(self, highlighter_threshold=0.5, highlighter_model='distilbert-base-cased-distilled-squad', *args, **kwargs) -> None:
+    def __init__(self, highlighter_threshold=0.3, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.extractor = pipeline("question-answering", model=highlighter_model)
+        self.extractor = pipeline(
+            "question-answering",
+            model=self.highlighter_model_name,
+            handle_impossible_answer=True,
+            max_answer_len=100,
+            max_question_len=100
+        )
         self.highlighter_threshold = highlighter_threshold
         # In case this hasn't been downloaded yet.
         import nltk
-        nltk.download('punkt_tab')
+        nltk.download('punkt_tab', quiet=True)
 
     def call_highlighter(self, context_str: str, question_str: str) -> HighlighterOutput:
         """This highlighter uses a BERT-based extractor to extract text from the context."""
@@ -252,7 +263,7 @@ class HSBERTExtractor(HSBaseline):
             )
 
         # Nothing to highlight.
-        if model_response['score'] < self.highlighter_threshold:
+        if model_response['score'] < self.highlighter_threshold or not model_response['answer'].strip():
             return HighlighterOutput(
                 highlighter_extracted=None,
                 highlighter_score=model_response['score'],
