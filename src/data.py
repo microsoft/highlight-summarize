@@ -24,10 +24,9 @@ def load_dataset(name):
             return repliqa_subsampled
         return repliqa
     elif name == "bioasq":
-        bioasq = load_bioasq()
-        if "subsampled" in name:
-            return bioasq.select(range(N))
-        return bioasq
+        return load_bioasq()
+    elif name == "bioasq-subsampled":
+        return load_bioasq().select(range(N))
     else:
         raise ValueError(f"Dataset {name} is not supported.")
 
