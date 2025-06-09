@@ -22,7 +22,7 @@ class QAPrediction(BaseModel):
 class QAEvaluator:
     def __init__(
         self,
-        model_name: str,
+        model_name: str | None,
         openai_client,
         temperature: float = 0.2,
         n_trials: int = 1,
