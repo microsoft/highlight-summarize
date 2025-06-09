@@ -63,13 +63,13 @@ def run_inference(run_id, experiment_config) -> datasets.Dataset:
     if os.path.exists(dst_dir):
         prediction_dataset = datasets.load_from_disk(dst_dir)
         if "answer_pred" in prediction_dataset.column_names:
-            print(f"> Skipping inference for {run_id} as results already exist.")
+            print(f" > Skipping inference for {run_id} as results already exist.")
             return prediction_dataset
         else:
             raise Exception(f"{run_id}: This shouldn't happen: missing 'answer_pred' column but dataset exists.")
 
-    print(f"> Running inference for {run_id}.")
-    print(f"> Loading dataset {experiment_config['dataset']}.")
+    print(f" > Running inference for {run_id}.")
+    print(f" > Loading dataset {experiment_config['dataset']}.")
     dataset = load_dataset(experiment_config["dataset"])
 
     # Set up the pipeline.
@@ -96,7 +96,7 @@ def run_inference(run_id, experiment_config) -> datasets.Dataset:
     now = time.time()
     prediction_dataset = dataset.map(
         pipeline,
-        desc=f"> Generating predictions",
+        desc=f" > Generating predictions",
         num_proc=N_PROC,
         load_from_cache_file=False, # We handle cache separately.
         )
@@ -106,7 +106,7 @@ def run_inference(run_id, experiment_config) -> datasets.Dataset:
         f.write(f"Elapsed time for predictions: {elapsed_time:.2f} seconds. Average: {elapsed_time / len(dataset):.2f} seconds per example.")
     
     # Store.
-    print(f"> Storing predictions to {dst_dir}.")
+    print(f" > Storing predictions to {dst_dir}.")
     prediction_dataset.save_to_disk(dst_dir)
 
     return prediction_dataset
@@ -119,19 +119,19 @@ def run_judgement(run_id, prediction_dataset) -> datasets.Dataset:
     dst_dir = f"{run_id}/judgement"
     # Try to load the existing results.
     if os.path.exists(dst_dir):
-        print(f"> Skipping judgement for {run_id} as results already exist.")
+        print(f" > Skipping judgement for {run_id} as results already exist.")
         return datasets.load_from_disk(dst_dir)
 
     # Run.
     judge = LLMJudgeStructured(openai_client=openai_client)
     judged_dataset = prediction_dataset.map(
         judge,
-        desc=f"> Judging predictions",
+        desc=f" > Judging predictions",
         num_proc=N_PROC,
         load_from_cache_file=False,
     )
     # Store.
-    print(f"> Storing judged predictions to {dst_dir}.")
+    print(f" > Storing judged predictions to {dst_dir}.")
     judged_dataset.save_to_disk(dst_dir)
 
     return judged_dataset
