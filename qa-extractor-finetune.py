@@ -133,7 +133,7 @@ def run(model_name):
         data_collator=data_collator,
     )
 
-    trainer.train(resume_from_checkpoint=True)
+    trainer.train() #resume_from_checkpoint=True)
     trainer.save_model(f"models/{model_name.replace('/', '-')}-repliqa")
 
 if __name__ == "__main__":
