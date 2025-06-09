@@ -18,3 +18,5 @@ azure-identity
 openpyxl
 tiktoken
 sentencepiece
+text_chunker
+nltk
