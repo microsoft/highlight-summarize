@@ -1,0 +1,40 @@
+# Configuration that applies to all experiments (unless overridden).
+base_experiment: &base
+    results_dir: "results/"
+    temperature: 0.2
+
+# The experiments to run.
+experiments:
+    rag_experiment:
+        <<: *base
+        pipeline: "QAEvaluator"
+        model_name: "gpt-4.1-mini"
+
+    hsbaseline_experiment:
+        <<: *base
+        pipeline: "HSBaseline"
+        highlighter_model_name: "gpt-4.1-mini"
+        summarizer_model_name: "gpt-4.1-mini"
+
+    hsstructured_experiment:
+        <<: *base
+        pipeline: "HSStructuredHighlighter"
+        highlighter_model_name: "gpt-4.1-mini"
+        summarizer_model_name: "gpt-4.1-mini"
+
+    hsbert_experiment:
+        <<: *base
+        pipeline: "HSBERTExtractor"
+        highlighter_model_name: "models/microsoft-deberta-v3-base-repliqa"
+        summarizer_model_name: "gpt-4.1-mini"
+
+    hsbert_experiment:
+        <<: *base
+        pipeline: "HSBERTExtractor"
+        highlighter_model_name: "models/microsoft-deberta-v3-base-repliqa"
+        summarizer_model_name: "gpt-4.1-mini"
+
+# The datasets to use in the experiments.
+datasets:
+    - repliqa_3-subsampled
+    - bioasq-subsampled
