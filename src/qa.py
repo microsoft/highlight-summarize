@@ -80,7 +80,7 @@ class QAEvaluator:
                     "content": system_prompt_str,
                 },
                 {"role": "user", "content": user_prompt_str},
-            ], temperature=self.temperature, model=self.model_name
+            ], temperature=self.temperature, model_name=self.model_name
         )
 
         if not model_response:

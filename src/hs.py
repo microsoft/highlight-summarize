@@ -106,18 +106,17 @@ class HSBaseline(QAEvaluator):
         # No response.
         if not model_response:
             return HighlighterOutput()
-        content = model_response.choices[0].message.content
         # Nothing to highlight.
-        if NOANSWER_PRED in content:
-            return HighlighterOutput(highlighter_llm_response=content)
+        if NOANSWER_PRED in model_response:
+            return HighlighterOutput(highlighter_llm_response=model_response)
         # Malformed output.
-        if not content.strip().startswith("- "):
-            return HighlighterOutput(highlighter_llm_response=content)
+        if not model_response.strip().startswith("- "):
+            return HighlighterOutput(highlighter_llm_response=model_response)
         # Extract the text extract(s) from the response.
-        text_extracts = content.strip().split("\n")
+        text_extracts = model_response.strip().split("\n")
         text_extracts = [extract.strip().lstrip("- ") for extract in text_extracts]
         if not text_extracts:
-            return HighlighterOutput(highlighter_llm_response=content)
+            return HighlighterOutput(highlighter_llm_response=model_response)
         
         # Check if the text extracts are in the context.
         valid_text_extracts = []
@@ -131,7 +130,7 @@ class HSBaseline(QAEvaluator):
 
         return HighlighterOutput(
             highlighter_extracted=valid_text.strip(),
-            highlighter_llm_response=content,
+            highlighter_llm_response=model_response,
             highlighter_text_extracts=text_extracts,
             highlighter_fuzzmatch_scores=scores,
         )

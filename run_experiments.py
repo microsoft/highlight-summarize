@@ -6,7 +6,6 @@ from typing import Any
 
 from src.qa import QAEvaluator
 from src.data import load_dataset
-from src.utils import openai_client
 from src.judges import LLMJudgeStructured
 from src.hs import HSBaseline, HSStructuredHighlighter, HSBERTExtractor
 
@@ -79,7 +78,6 @@ def run_inference(run_id, experiment_config) -> datasets.Dataset:
     if experiment_config["pipeline"] == "QAEvaluator":
         pipeline = pipeline_cls(
                     model_name=experiment_config["model_name"],
-                    openai_client=openai_client,
                     temperature=experiment_config["temperature"],
                     n_trials=N_TRIALS,
         )
@@ -87,7 +85,6 @@ def run_inference(run_id, experiment_config) -> datasets.Dataset:
         pipeline = pipeline_cls(
                     highlighter_model_name=experiment_config["highlighter_model_name"],
                     summarizer_model_name=experiment_config["summarizer_model_name"],
-                    openai_client=openai_client,
                     temperature=experiment_config["temperature"],
                     n_trials=N_TRIALS,
         )
@@ -123,7 +120,7 @@ def run_judgement(run_id, prediction_dataset) -> datasets.Dataset:
         return datasets.load_from_disk(dst_dir)
 
     # Run.
-    judge = LLMJudgeStructured(openai_client=openai_client)
+    judge = LLMJudgeStructured()
     judged_dataset = prediction_dataset.map(
         judge,
         desc=f"    > Judging predictions",
