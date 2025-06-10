@@ -1,7 +1,8 @@
 import os
 from typing import Literal
-from openai import AzureOpenAI
+from openai import AzureOpenAI, NOT_GIVEN
 from dotenv import load_dotenv
+from tenacity import retry, wait_random_exponential, stop_after_attempt
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 # COMMON.
@@ -24,16 +25,20 @@ def openai_client() -> AzureOpenAI:
         azure_ad_token_provider=get_bearer_token_provider(DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"),
     )
 
+@retry(
+    wait=wait_random_exponential(min=1, max=60),
+    stop=stop_after_attempt(5),
+)
 def query_llm(messages: list[dict[str, str]], temperature, model_name: str, response_format = None):
     # Structured output: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/structured-outputs?tabs=python-secure%2Cdotnet-entra-id&pivots=programming-language-python.
     model_response = openai_client().beta.chat.completions.parse(
         messages=messages,
         temperature=temperature,
         model=model_name,
-        response_format=response_format,
+        response_format=response_format or NOT_GIVEN,
     )
 
-    if not model_response.choices or not model_response.choices[0]:
+    if not model_response or not model_response.choices or not model_response.choices[0]:
         return None
 
     if response_format is None:
