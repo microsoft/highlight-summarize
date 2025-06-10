@@ -1,12 +1,11 @@
 from rapidfuzz import fuzz
 from textwrap import dedent
-from types import FunctionType
 from pydantic import BaseModel
 from transformers import pipeline
 from text_chunker import sentences
 
 from .qa import QAEvaluator, QAPrediction
-from .utils import NOANSWER_PRED, FAILED_PRED
+from .utils import NOANSWER_PRED, FAILED_PRED, query_llm
 
 BASELINE_EXTRACTOR_PROMPT = dedent(
     "You are an expert research assistant."
@@ -54,7 +53,6 @@ class HSBaseline(QAEvaluator):
         self,
         highlighter_model_name: str,
         summarizer_model_name: str,
-        openai_client: FunctionType,
         temperature: float = 0.3,
         n_trials: int = 1,
         sleep_time_between_retrials: float = 1.0,
@@ -64,7 +62,6 @@ class HSBaseline(QAEvaluator):
     ) -> None:
         super().__init__(
             model_name=None,
-            openai_client=openai_client,
             temperature=temperature,
             n_trials=n_trials,
             sleep_time_between_retrials=sleep_time_between_retrials,
@@ -97,19 +94,17 @@ class HSBaseline(QAEvaluator):
         )
         
     def call_highlighter(self, context_str: str, question_str: str) -> HighlighterOutput:
-        model_response = self.openai_client().chat.completions.create(
-            messages=[
-                {"role": "user", "content": self.extractor_prompt.format(
-                    context=context_str,
-                    question_str=question_str,
-                )}
-            ],
-            temperature=self.temperature,
-            model=self.highlighter_model_name,
+        """This highlighter uses an LLM to extract text from the context."""
+        model_response = query_llm(messages=[
+            {"role": "user", "content": self.extractor_prompt.format(
+                context=context_str,
+                question_str=question_str,
+            )}
+        ], temperature=self.temperature, model_name=self.highlighter_model_name,
         )
 
         # No response.
-        if not model_response.choices or not model_response.choices[0].message.content:
+        if not model_response:
             return HighlighterOutput()
         content = model_response.choices[0].message.content
         # Nothing to highlight.
@@ -142,26 +137,30 @@ class HSBaseline(QAEvaluator):
         )
 
     def call_summarizer(self, text_extract: str) -> SummarizerOutput:
-        # Structured output: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/structured-outputs?tabs=python-secure%2Cdotnet-entra-id&pivots=programming-language-python.
+        """This summarizer uses an LLM to summarize the text extract."""
         class LLMSummarizerOutput(BaseModel):
             guessed_question: str
             answer: str
-        raw_response = self.openai_client().beta.chat.completions.parse(
-            messages=[
-                {"role": "user", "content": self.summarizer_prompt.format(
-                    text_extract=text_extract,
-                )}
-            ],
-            temperature=self.temperature,
-            model=self.summarizer_model_name,
-            response_format=LLMSummarizerOutput,
-        ).choices[0].message.parsed
+
+        model_response = query_llm(messages=[
+            {"role": "user", "content": self.summarizer_prompt.format(
+                text_extract=text_extract,
+            )}
+        ], temperature=self.temperature, model_name=self.summarizer_model_name,
+        response_format=LLMSummarizerOutput)
+
+        if not model_response:
+            return SummarizerOutput(
+                # Failed prediction if the LLM gives no answer.
+                answer_pred=FAILED_PRED,
+                summarizer_llm_response=None,
+            )
 
         return SummarizerOutput(
             # Failed prediction if the LLM gives no answer.
-            answer_pred=raw_response.answer if hasattr(raw_response, "answer") else FAILED_PRED,
-            summarizer_llm_response=str(raw_response),
-            summarizer_llm_guessed_question=raw_response.guessed_question if hasattr(raw_response, "guessed_question") else None,
+            answer_pred=model_response.answer if hasattr(model_response, "answer") else FAILED_PRED,
+            summarizer_llm_response=str(model_response),
+            summarizer_llm_guessed_question=model_response.guessed_question if hasattr(model_response, "guessed_question") else None,
         )
 
 class HSStructuredHighlighter(HSBaseline):
@@ -190,22 +189,17 @@ class HSStructuredHighlighter(HSBaseline):
             answer: str
             text_extracts: list[str]
 
-        try:
-            model_response = self.openai_client().beta.chat.completions.parse(
-                messages=[
-                    {"role": "user", "content": self.extractor_prompt.format(
-                        context=context_str,
-                        question_str=question_str,
-                    )}
-                ],
-                temperature=self.temperature,
-                model=self.highlighter_model_name,
-                response_format=LLMOutput,
-            ).choices[0].message.parsed
-        except Exception as e:
-            print(f"Error in call_highlighter: {e}")
+        model_response = query_llm(messages=[
+            {"role": "user", "content": self.extractor_prompt.format(
+                context=context_str,
+                question_str=question_str,
+            )}
+        ], temperature=self.temperature, model_name=self.highlighter_model_name,
+        response_format=LLMOutput)
+
+        if not model_response:
             return HighlighterOutput(
-                highlighter_llm_response=f"Error: {e}"
+                highlighter_llm_response=None
             )
 
         # Nothing to highlight.
