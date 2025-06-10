@@ -6,7 +6,7 @@ import requests
 from typing import Any
 from pydantic import BaseModel
 
-from .utils import NOANSWER_PRED, FAILED_PRED
+from .utils import NOANSWER_PRED, FAILED_PRED, query_llm
 
 
 class QAPrediction(BaseModel):
@@ -23,7 +23,6 @@ class QAEvaluator:
     def __init__(
         self,
         model_name: str | None,
-        openai_client,
         temperature: float = 0.2,
         n_trials: int = 1,
         sleep_time_between_retrials: float = 1.0,
@@ -56,7 +55,6 @@ class QAEvaluator:
         self.n_trials = n_trials
         self.sleep_time_between_retrials = sleep_time_between_retrials
         self.max_sleep_time_between_retrials = max_sleep_time_between_retrials
-        self.openai_client = openai_client
         self.model_name = model_name
         self.temperature = temperature
 
@@ -74,25 +72,23 @@ class QAEvaluator:
                 context=context_str,
                 question_str=question_str,
         )
-        model_response = self.openai_client().chat.completions.create(
-                    messages=[
-                                {
-                                    "role": "system",
-                                    "content": system_prompt_str,
-                                },
-                                {"role": "user", "content": user_prompt_str},
-                            ],
-                    temperature=self.temperature,
-                    model=self.model_name,
-                )
 
-        llm_response = model_response.choices[0].message.content
-        if not llm_response:
-            return QAPrediction(answer_pred=FAILED_PRED, llm_response=llm_response)
+        model_response = query_llm(
+            messages=[
+                {
+                    "role": "system",
+                    "content": system_prompt_str,
+                },
+                {"role": "user", "content": user_prompt_str},
+            ], temperature=self.temperature, model=self.model_name
+        )
+
+        if not model_response:
+            return QAPrediction(answer_pred=FAILED_PRED, llm_response=model_response)
 
         return QAPrediction(
-            answer_pred=llm_response.split(":")[-1].strip(),
-            llm_response=llm_response,
+            answer_pred=model_response.split(":")[-1].strip(),
+            llm_response=model_response,
             model_name=self.model_name,
             temperature=self.temperature,
         )
