@@ -6,7 +6,7 @@ from typing import Any
 
 from src.qa import QAEvaluator
 from src.data import load_dataset
-from src.judges import LLMJudgeStructured
+from src.judges import JUDGES_MAP
 from src.threads import mt_map
 from src.hs import HSBaseline, HSStructuredHighlighter, HSBERTExtractor
 
@@ -104,23 +104,42 @@ def run_inference(run_id, experiment_config, max_threads) -> datasets.Dataset:
     return prediction_dataset
 
 
-def run_judgement(run_id, prediction_dataset, max_threads) -> datasets.Dataset:
+def run_judgement(run_id, prediction_dataset, judges_config, max_threads) -> datasets.Dataset:
     """Run the judgement for a given experiment configuration.
     This function would typically call the actual judgement logic.
     """
+    judges = judges_config["judges"]
     dst_dir = f"{run_id}/judgement"
     # Try to load the existing results.
     if os.path.exists(dst_dir):
-        print(f"    > Skipping judgement for {run_id} as results already exist.")
-        return datasets.load_from_disk(dst_dir)
+        print(f"    > Skipping judgement for {run_id} as results already exist in {dst_dir}.")
+        judged_dataset = datasets.load_from_disk(dst_dir)
+        # Check that all judges are present.
+        for judge_name in judges:
+            # We just string-match for simplicity.
+            for column_name in judged_dataset.column_names:
+                if judge_name in column_name:
+                    break
+            else:
+                raise ValueError(f"Judge {judge_name} is missing from the dataset {run_id}. Delete the directory to rerun the judgement.")
+        return judged_dataset
 
     # Run.
-    judge = LLMJudgeStructured()
-    judged_dataset = mt_map(
-        function=judge,
-        dataset=prediction_dataset,
-        max_threads=max_threads,
-    )
+    judged_dataset = prediction_dataset
+    for judge_name in judges:
+        judge_cls = JUDGES_MAP.get(judge_name)
+        if judge_cls is None:
+            raise ValueError(f"Judge {judge_name} is not supported.")
+        print(f"    > Running judgement for {run_id} with judge {judge_name}.")
+        judge = judge_cls(
+            model_name=judges_config["model_name"],
+            temperature=judges_config["temperature"],
+        )
+        judged_dataset = mt_map(
+            function=judge,
+            dataset=judged_dataset,
+            max_threads=max_threads,
+        )
     # Store.
     print(f"    > Storing judged predictions to {dst_dir}.")
     judged_dataset.save_to_disk(dst_dir)
@@ -173,4 +192,4 @@ if __name__ == "__main__":
 
         max_threads = experiment_config.get("max_threads", 8)
         prediction_dataset = run_inference(run_id, experiment_config, max_threads)
-        run_judgement(run_id, prediction_dataset, max_threads)
+        run_judgement(run_id, prediction_dataset, config["judges_config"], max_threads)
