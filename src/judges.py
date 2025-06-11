@@ -41,7 +41,7 @@ class LLMJudgeStructured():
         """
         formatted_response = {}
         for factor, response in responses.items():
-            formatted_response[f"{self.judge_name}_{factor}"] = response.rating
+            formatted_response[f"{self.judge_name}_{factor}_rating"] = response.rating
             formatted_response[f"{self.judge_name}_{factor}_explanation"] = response.explanation
         return formatted_response
 
@@ -140,7 +140,7 @@ judges.base.get_completion = patched_get_completion
 ####################################################################################
 
 class PollMultihopCorrectness(LLMJudgeStructured):
-    def __init__(self, model_name = "gpt-4.1-mini", temperature = 0, scale_min = 1, scale_max = 5):
+    def __init__(self, model_name = "gpt-4.1-mini", temperature = 0, scale_min = 1, scale_max = 10):
         super().__init__(model_name=model_name, temperature=temperature, scale_min=scale_min, scale_max=scale_max)
         self.judge_name = f"PollMultihopCorrectness-{model_name}"
         self.correct = True
@@ -192,7 +192,7 @@ class MTBenchChatBotResponseQuality(LLMJudgeStructured):
         }
 
 class ReliableCIRelevance(MTBenchChatBotResponseQuality):
-    def __init__(self, model_name = "gpt-4.1-mini", temperature = 0, scale_min = 1, scale_max = 10):
+    def __init__(self, model_name = "gpt-4.1-mini", temperature = 0, scale_min = 0, scale_max = 3):
         super().__init__(model_name=model_name, temperature=temperature, scale_min=scale_min, scale_max=scale_max)
         self.judge_name = f"ReliableCIRelevance-{model_name}"
         self.correct = scale_max
