@@ -54,7 +54,6 @@ class HSBaseline(QAEvaluator):
         highlighter_model_name: str,
         summarizer_model_name: str,
         temperature: float = 0.3,
-        n_trials: int = 1,
         sleep_time_between_retrials: float = 1.0,
         max_sleep_time_between_retrials: float = 600.0,
         extractor_prompt: str = BASELINE_EXTRACTOR_PROMPT,
@@ -63,7 +62,6 @@ class HSBaseline(QAEvaluator):
         super().__init__(
             model_name=None,
             temperature=temperature,
-            n_trials=n_trials,
             sleep_time_between_retrials=sleep_time_between_retrials,
             max_sleep_time_between_retrials=max_sleep_time_between_retrials,
         )
