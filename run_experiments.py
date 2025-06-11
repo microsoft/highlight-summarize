@@ -153,6 +153,7 @@ def load_all_results(results_dir="results/") -> dict[str, Any]:
     for dataset_name in os.listdir(results_dir):
         dataset_path = os.path.join(results_dir, dataset_name)
         if os.path.isdir(dataset_path):
+            print(f"[*] Loading results for dataset: {dataset_name}")
             for pipeline_name in os.listdir(dataset_path):
                 run_id = os.path.join(dataset_path, pipeline_name)
                 if os.path.isdir(run_id):
@@ -167,6 +168,8 @@ def load_all_results(results_dir="results/") -> dict[str, Any]:
                             "config": config,
                             "judged_dataset": judged,
                         }
+                    else:
+                        print("Skipping run_id as no judgement results found:", run_id)
     return results
 
 
@@ -190,6 +193,6 @@ if __name__ == "__main__":
                     "Please remove the existing directory to rerun the experiment."
                 )
 
-        max_threads = experiment_config.get("max_threads", 8)
+        max_threads = config.get("max_threads", 8)
         prediction_dataset = run_inference(run_id, experiment_config, max_threads)
         run_judgement(run_id, prediction_dataset, config["judges_config"], max_threads)
