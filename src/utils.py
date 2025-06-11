@@ -1,16 +1,16 @@
 import os
 import sys
 import logging
-from typing import Literal
 from openai import AzureOpenAI, NOT_GIVEN
 from dotenv import load_dotenv
-from tenacity import retry, wait_random_exponential, stop_after_attempt, before_sleep_log
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
-logging.basicConfig(stream=sys.stderr, level=logging.WARN)
+logging.basicConfig(stream=sys.stderr, level=logging.ERROR)
 logger = logging.getLogger(__name__)
 
 # COMMON.
+OPENAI_TIMEOUT = 20
+OPENAI_RETRIES = 5
 NOANSWER_PRED = "UNANSWERABLE"
 FAILED_PRED = "FAILED"
 
@@ -28,16 +28,16 @@ def openai_client() -> AzureOpenAI:
         api_version="2024-12-01-preview",
         azure_endpoint=endpoint,
         azure_ad_token_provider=get_bearer_token_provider(DefaultAzureCredential(), "https://cognitiveservices.azure.com/.default"),
+        timeout=OPENAI_TIMEOUT,
+        max_retries=OPENAI_RETRIES,
     )
 
-@retry(
-    wait=wait_random_exponential(multiplier=1, max=30),
-    stop=stop_after_attempt(3),
-    before_sleep=before_sleep_log(logger, logging.DEBUG),
-)
+client = openai_client()
+
+
 def query_llm(messages: list[dict[str, str]], temperature, model_name: str, response_format = None):
     # Structured output: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/structured-outputs?tabs=python-secure%2Cdotnet-entra-id&pivots=programming-language-python.
-    model_response = openai_client().beta.chat.completions.parse(
+    model_response = client.beta.chat.completions.parse(
         messages=messages,
         temperature=temperature,
         model=model_name,
