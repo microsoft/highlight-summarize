@@ -38,3 +38,14 @@ experiments:
 datasets:
     - repliqa_3-subsampled
     - bioasq-subsampled
+
+judges_config:
+    model_name: "gpt-4.1-mini"
+    temperature: 0
+    judges:
+    - LLMJudgeStructured
+    - PollMultihopCorrectness
+    - MTBenchChatBotResponseQuality
+    - ReliableCIRelevance
+
+max_threads: 50

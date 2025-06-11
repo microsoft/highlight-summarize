@@ -200,7 +200,7 @@ class ReliableCIRelevance(MTBenchChatBotResponseQuality):
         self.judge = judges.ReliableCIRelevance(model=model_name)
 
 
-JUDGES = {
+JUDGES_MAP = {
     "LLMJudgeStructured": LLMJudgeStructured,
     "PollMultihopCorrectness": PollMultihopCorrectness,
     "MTBenchChatBotResponseQuality": MTBenchChatBotResponseQuality,
