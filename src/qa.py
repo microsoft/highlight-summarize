@@ -1,8 +1,5 @@
 """Standard Question Answering, as one would usually find in a RAG pipeline.
 """
-import time
-import json
-import requests
 from typing import Any
 from pydantic import BaseModel
 
@@ -24,7 +21,6 @@ class QAEvaluator:
         self,
         model_name: str | None,
         temperature: float = 0.2,
-        n_trials: int = 1,
         sleep_time_between_retrials: float = 1.0,
         max_sleep_time_between_retrials: float = 600.0,
     ) -> None:
@@ -52,7 +48,6 @@ class QAEvaluator:
             "Question: {question_str}?\n"
         )
 
-        self.n_trials = n_trials
         self.sleep_time_between_retrials = sleep_time_between_retrials
         self.max_sleep_time_between_retrials = max_sleep_time_between_retrials
         self.model_name = model_name
@@ -102,23 +97,9 @@ class QAEvaluator:
             raise ValueError("Unknown data format. Can't read 'document_extracted' or 'entity_pages' fields.")
         question_str = example["question"]
         
-        for trial in range(self.n_trials):
-            try:
-                prediction = self.call_model(context_str, question_str)
-                break
-            except (
-                KeyError,
-                IndexError,
-                json.JSONDecodeError,
-                requests.exceptions.ConnectionError,
-                requests.exceptions.ChunkedEncodingError,
-            ) as e:
-                print(f"Trial: {trial}: {e}")
-                prediction = QAPrediction(answer_pred="")
-                sleep_time = min(
-                    self.max_sleep_time_between_retrials,
-                    self.sleep_time_between_retrials * (2 ** (trial + 1)),
-                )
-                time.sleep(sleep_time)
+        try:
+            prediction = self.call_model(context_str, question_str)
+        except Exception as e:
+            prediction = QAPrediction(answer_pred=FAILED_PRED)
 
         return prediction.model_dump()

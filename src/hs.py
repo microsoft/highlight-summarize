@@ -230,13 +230,16 @@ class HSBERTExtractor(HSBaseline):
     """
     def __init__(self, highlighter_threshold=0.3, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.extractor = pipeline(
-            "question-answering",
-            model=self.highlighter_model_name,
-            handle_impossible_answer=True,
-            max_answer_len=100,
-            max_question_len=100
-        )
+        try:
+            self.extractor = pipeline(
+                "question-answering",
+                model=self.highlighter_model_name,
+                handle_impossible_answer=True,
+                max_answer_len=100,
+                max_question_len=100
+            )
+        except OSError as e:
+            raise ValueError(f"Failed to load the highlighter model '{self.highlighter_model_name}'. Is it there?")
         self.highlighter_threshold = highlighter_threshold
         # In case this hasn't been downloaded yet.
         import nltk
