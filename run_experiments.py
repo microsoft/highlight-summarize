@@ -7,11 +7,9 @@ from typing import Any
 from src.qa import QAEvaluator
 from src.data import load_dataset
 from src.judges import LLMJudgeStructured
+from src.threads import mt_map
 from src.hs import HSBaseline, HSStructuredHighlighter, HSBERTExtractor
 
-
-N_PROC = 20
-N_TRIALS = 5
 
 PIPELINE_MAP = {
     "QAEvaluator": QAEvaluator,
@@ -53,7 +51,7 @@ def load_config(path):
 
     return config
 
-def run_inference(run_id, experiment_config) -> datasets.Dataset:
+def run_inference(run_id, experiment_config, max_threads) -> datasets.Dataset:
     """Run the inference for a given experiment configuration.
     This function would typically call the actual inference logic.
     """
@@ -79,24 +77,21 @@ def run_inference(run_id, experiment_config) -> datasets.Dataset:
         pipeline = pipeline_cls(
                     model_name=experiment_config["model_name"],
                     temperature=experiment_config["temperature"],
-                    n_trials=N_TRIALS,
         )
     else:
         pipeline = pipeline_cls(
                     highlighter_model_name=experiment_config["highlighter_model_name"],
                     summarizer_model_name=experiment_config["summarizer_model_name"],
                     temperature=experiment_config["temperature"],
-                    n_trials=N_TRIALS,
         )
 
     # Run.
     now = time.time()
-    prediction_dataset = dataset.map(
-        pipeline,
-        desc=f"    > Generating predictions",
-        num_proc=N_PROC,
-        load_from_cache_file=False, # We handle cache separately.
-        )
+    prediction_dataset = mt_map(
+        function=pipeline,
+        dataset=dataset,
+        max_threads=max_threads,
+    )
     elapsed_time = time.time() - now
 
     with open(f"{run_id}/run.txt", "w") as f:
@@ -109,7 +104,7 @@ def run_inference(run_id, experiment_config) -> datasets.Dataset:
     return prediction_dataset
 
 
-def run_judgement(run_id, prediction_dataset) -> datasets.Dataset:
+def run_judgement(run_id, prediction_dataset, max_threads) -> datasets.Dataset:
     """Run the judgement for a given experiment configuration.
     This function would typically call the actual judgement logic.
     """
@@ -121,11 +116,10 @@ def run_judgement(run_id, prediction_dataset) -> datasets.Dataset:
 
     # Run.
     judge = LLMJudgeStructured()
-    judged_dataset = prediction_dataset.map(
-        judge,
-        desc=f"    > Judging predictions",
-        num_proc=N_PROC,
-        load_from_cache_file=False,
+    judged_dataset = mt_map(
+        function=judge,
+        dataset=prediction_dataset,
+        max_threads=max_threads,
     )
     # Store.
     print(f"    > Storing judged predictions to {dst_dir}.")
@@ -177,5 +171,6 @@ if __name__ == "__main__":
                     "Please remove the existing directory to rerun the experiment."
                 )
 
-        prediction_dataset = run_inference(run_id, experiment_config)
-        run_judgement(run_id, prediction_dataset)
+        max_threads = experiment_config.get("max_threads", 8)
+        prediction_dataset = run_inference(run_id, experiment_config, max_threads)
+        run_judgement(run_id, prediction_dataset, max_threads)

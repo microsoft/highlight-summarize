@@ -20,4 +20,3 @@ tiktoken
 sentencepiece
 text_chunker
 nltk
-tenacity
