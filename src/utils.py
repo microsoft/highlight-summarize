@@ -1,9 +1,14 @@
 import os
+import sys
+import logging
 from typing import Literal
 from openai import AzureOpenAI, NOT_GIVEN
 from dotenv import load_dotenv
-from tenacity import retry, wait_random_exponential, stop_after_attempt
+from tenacity import retry, wait_random_exponential, stop_after_attempt, before_sleep_log
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+
+logging.basicConfig(stream=sys.stderr, level=logging.WARN)
+logger = logging.getLogger(__name__)
 
 # COMMON.
 NOANSWER_PRED = "UNANSWERABLE"
@@ -26,8 +31,9 @@ def openai_client() -> AzureOpenAI:
     )
 
 @retry(
-    wait=wait_random_exponential(min=1, max=60),
-    stop=stop_after_attempt(5),
+    wait=wait_random_exponential(multiplier=1, max=30),
+    stop=stop_after_attempt(3),
+    before_sleep=before_sleep_log(logger, logging.DEBUG),
 )
 def query_llm(messages: list[dict[str, str]], temperature, model_name: str, response_format = None):
     # Structured output: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/structured-outputs?tabs=python-secure%2Cdotnet-entra-id&pivots=programming-language-python.
