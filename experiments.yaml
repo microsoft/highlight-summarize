@@ -31,13 +31,15 @@ experiments:
     hsbert_experiment:
         <<: *base
         pipeline: "HSBERTExtractor"
-        highlighter_model_name: "models/microsoft-deberta-v3-base-repliqa"
+        highlighter_model_name: "deepset/deberta-v3-base-squad2"
         summarizer_model_name: "gpt-4.1-mini"
 
 # The datasets to use in the experiments.
 datasets:
-    - repliqa_3-subsampled
-    - bioasq-subsampled
+    - repliqa_3
+    - bioasq
+    # - repliqa_3-subsampled
+    # - bioasq-subsampled
 
 judges_config:
     model_name: "gpt-4.1-mini"
