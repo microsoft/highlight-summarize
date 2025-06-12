@@ -141,6 +141,7 @@ def run_judgement(run_id: str, prediction_dataset: datasets.Dataset, judges_conf
             max_threads=max_threads,
         )
     # Store.
+    judged_dataset = datasets.Dataset.from_list(judged_dataset)
     print(f"    > Storing judged predictions to {dst_dir}.")
     judged_dataset.save_to_disk(dst_dir)
 
