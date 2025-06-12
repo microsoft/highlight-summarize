@@ -2,6 +2,7 @@ import datasets
 
 from .utils import NOANSWER_PRED
 
+
 def load_dataset(name):
     """Load a dataset by name.
     Supported datasets:
@@ -10,17 +11,21 @@ def load_dataset(name):
     - bioasq
     - bioasq-subsampled
     """
-    N = 40 # Number of examples to use for the subsampled datasets.
+    N = 40  # Number of examples to use for the subsampled datasets.
     if name.startswith("repliqa"):
         split = int(name.split("_")[-1].split("-")[0])
         repliqa = load_repliqa(split)
         if "subsampled" in name:
-            repliqa_subsampled = repliqa.select(range(int(N/2)))
+            repliqa_subsampled = repliqa.select(range(int(N / 2)))
             # Returns a balanced dataset with half of the examples being unanswerable.
-            repliqa_subsampled = datasets.concatenate_datasets([
-                repliqa_subsampled,
-                repliqa.filter(lambda example: example["answer"] == NOANSWER_PRED).select(range(int(N/2)))
-            ])
+            repliqa_subsampled = datasets.concatenate_datasets(
+                [
+                    repliqa_subsampled,
+                    repliqa.filter(
+                        lambda example: example["answer"] == NOANSWER_PRED
+                    ).select(range(int(N / 2))),
+                ]
+            )
             return repliqa_subsampled
         return repliqa
     elif name == "bioasq":
@@ -29,6 +34,7 @@ def load_dataset(name):
         return load_bioasq().select(range(N))
     else:
         raise ValueError(f"Dataset {name} is not supported.")
+
 
 def load_repliqa(split=3):
     dataset_name = f"repliqa_{split}"
@@ -43,24 +49,31 @@ def load_repliqa(split=3):
         wrongly_labelled = [
             "The title of the mural is not mentioned in the document.",
             "Clara Bennett's book release date is not provided in the document.",
-            "The document doesn't specify the exact date, it only mentions the 'late 2010s.'"
+            "The document doesn't specify the exact date, it only mentions the 'late 2010s.'",
         ]
-        if "The document does not" in example["answer"] or example["answer"] in wrongly_labelled:
+        if (
+            "The document does not" in example["answer"]
+            or example["answer"] in wrongly_labelled
+        ):
             return {"answer": NOANSWER_PRED}
-        
+
         return example
 
     clean_repliqa = repliqa.map(fix_label)
 
     return clean_repliqa
 
+
 def load_bioasq():
-    dataset_qa_traintest = datasets.load_dataset("enelpol/rag-mini-bioasq", "question-answer-passages")
-    dataset_qa = datasets.concatenate_datasets([
-        dataset_qa_traintest["train"],
-        dataset_qa_traintest["test"]
-    ])
-    dataset_corpus = datasets.load_dataset("enelpol/rag-mini-bioasq", "text-corpus")["test"]
+    dataset_qa_traintest = datasets.load_dataset(
+        "enelpol/rag-mini-bioasq", "question-answer-passages"
+    )
+    dataset_qa = datasets.concatenate_datasets(
+        [dataset_qa_traintest["train"], dataset_qa_traintest["test"]]
+    )
+    dataset_corpus = datasets.load_dataset("enelpol/rag-mini-bioasq", "text-corpus")[
+        "test"
+    ]
 
     # Corpus to dict for speed.
     corpus_dict = {}

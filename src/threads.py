@@ -1,5 +1,5 @@
-"""Enables threaded execution of GPT-like calls.
-"""
+"""Enables threaded execution of GPT-like calls."""
+
 import time
 import datasets
 import concurrent
@@ -7,24 +7,29 @@ from tqdm import tqdm
 
 MAX_THREADS = 50
 
+
 class Counter:
-    """Monitors the status of our threads. Used for debugging and monitoring.
-    """
+    """Monitors the status of our threads. Used for debugging and monitoring."""
+
     running = 0
     waiting = 0
     failed = 0
+
     def __init__(self, pbar):
         self.pbar = pbar
         self.display()
 
     def display(self):
-        self.pbar.set_description(f"Running: {self.running}, Waiting: {self.waiting}, Failed: {self.failed}. Progress")
+        self.pbar.set_description(
+            f"Running: {self.running}, Waiting: {self.waiting}, Failed: {self.failed}. Progress"
+        )
 
     def update(self, waiting=0, running=0, failed=0):
         self.waiting += waiting
         self.running += running
         self.failed += failed
         self.display()
+
 
 def mt_exec(example: dict, function: callable) -> dict:
     """Contains all the thread logic for launching the function, including sleeping and error handling.
@@ -57,10 +62,12 @@ def mt_exec(example: dict, function: callable) -> dict:
     counter.update(failed=1, running=-1)
     return {}
 
-def mt_map(function: callable, dataset: datasets.Dataset, max_threads: int = MAX_THREADS) -> datasets.Dataset:
-    """Maps a function over a dataset using multiple threads.
-    """
-    global counter # Gives us fancy stats and a progress bar.
+
+def mt_map(
+    function: callable, dataset: datasets.Dataset, max_threads: int = MAX_THREADS
+) -> datasets.Dataset:
+    """Maps a function over a dataset using multiple threads."""
+    global counter  # Gives us fancy stats and a progress bar.
 
     # Map to dict.
     dataset_dict = {ex_id: example for ex_id, example in enumerate(dataset.to_list())}
@@ -76,8 +83,9 @@ def mt_map(function: callable, dataset: datasets.Dataset, max_threads: int = MAX
                     mt_exec,
                     example=dataset_dict[ex_id],
                     function=function,
-                ): ex_id for ex_id in dataset_dict
-                }
+                ): ex_id
+                for ex_id in dataset_dict
+            }
             for future in concurrent.futures.as_completed(future_to_example):
                 ex_id = future_to_example[future]
                 try:
@@ -87,6 +95,6 @@ def mt_map(function: callable, dataset: datasets.Dataset, max_threads: int = MAX
                 else:
                     dataset_dict[ex_id].update(res)
                 pbar.update(1)
-    
+
     # Convert back to a Dataset.
     return datasets.Dataset.from_list(list(dataset_dict.values()))
