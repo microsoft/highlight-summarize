@@ -32,9 +32,9 @@ class LLMJudgeStructured:
             {input}
             [Expected]
             {expected}
-            [The Start of Assistant’s Answer]
+            [The Start of Assistant's Answer]
             {output}
-            [The End of Assistant’s Answer]"""
+            [The End of Assistant's Answer]"""
         )
         self.factors = ["correctness", "faithfulness", "naturalness"]
         # This can be overridden by the judge.
