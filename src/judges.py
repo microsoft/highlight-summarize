@@ -68,7 +68,7 @@ class LLMJudgeStructured:
             return self._format_response({factor: response for factor in self.factors})
 
         # Call judge.
-        judgement = self._call_judge(
+        judgement = self.call_judge(
             input=example["question"],
             output=example["answer"],
             expected=example["answer_pred"],
@@ -76,7 +76,7 @@ class LLMJudgeStructured:
 
         return self._format_response(judgement)
 
-    def _call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
+    def call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
         """Provides a response for each of the factors specified in the prompt."""
 
         # Call judge.
@@ -173,7 +173,7 @@ class PollMultihopCorrectnessWrapper(LLMJudgeStructured):
         self.incorrect = False
         self.judge = j.PollMultihopCorrectness(model=model_name)
 
-    def _call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
+    def call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
         """Calls the PollMultihopCorrectness judge and formats the response."""
         # Call judge.
         model_response = self.judge.judge(input=input, output=output, expected=expected)
@@ -201,7 +201,7 @@ class MTBenchChatBotResponseQualityWrapper(LLMJudgeStructured):
         self.incorrect = scale_min
         self.judge = j.MTBenchChatBotResponseQuality(model=model_name)
 
-    def _call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
+    def call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
         """Calls the MTBenchChatBotResponseQuality judge and formats the response."""
         # Call judge.
         model_response = self.judge.judge(input=input, output=output, expected=expected)
