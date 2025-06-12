@@ -125,7 +125,7 @@ def run_judgement(run_id: str, prediction_dataset: datasets.Dataset, judges_conf
         return judged_dataset
 
     # Run.
-    judged_dataset = prediction_dataset.to_list()
+    judged_dataset = prediction_dataset
     for judge_name in judges:
         judge_cls = JUDGES_MAP.get(judge_name)
         if judge_cls is None:
@@ -141,7 +141,6 @@ def run_judgement(run_id: str, prediction_dataset: datasets.Dataset, judges_conf
             max_threads=max_threads,
         )
     # Store.
-    judged_dataset = datasets.Dataset.from_list(judged_dataset)
     print(f"    > Storing judged predictions to {dst_dir}.")
     judged_dataset.save_to_disk(dst_dir)
 
