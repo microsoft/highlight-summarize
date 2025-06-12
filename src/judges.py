@@ -1,4 +1,4 @@
-import judges
+import judges as j
 from textwrap import dedent
 from typing import Any
 from pydantic import BaseModel
@@ -135,17 +135,17 @@ def patched_get_completion(
         seed=seed,
         response_format=response_format,
     )
-judges.base.get_completion = patched_get_completion
+j.base.get_completion = patched_get_completion
 # End of the hack.
 ####################################################################################
 
-class PollMultihopCorrectness(LLMJudgeStructured):
+class PollMultihopCorrectnessWrapper(LLMJudgeStructured):
     def __init__(self, model_name = "gpt-4.1-mini", temperature = 0, scale_min = 1, scale_max = 10):
         super().__init__(model_name=model_name, temperature=temperature, scale_min=scale_min, scale_max=scale_max)
         self.judge_name = f"PollMultihopCorrectness-{model_name}"
         self.correct = True
         self.incorrect = False
-        self.judge = judges.PollMultihopCorrectness(model=model_name)
+        self.judge = j.PollMultihopCorrectness(model=model_name)
 
     def _call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
         """Calls the PollMultihopCorrectness judge and formats the response.
@@ -165,13 +165,13 @@ class PollMultihopCorrectness(LLMJudgeStructured):
             )
         }
 
-class MTBenchChatBotResponseQuality(LLMJudgeStructured):
+class MTBenchChatBotResponseQualityWrapper(LLMJudgeStructured):
     def __init__(self, model_name = "gpt-4.1-mini", temperature = 0, scale_min = 1, scale_max = 10):
         super().__init__(model_name=model_name, temperature=temperature, scale_min=scale_min, scale_max=scale_max)
         self.judge_name = f"MTBenchChatBotResponseQuality-{model_name}"
         self.correct = scale_max
         self.incorrect = scale_min
-        self.judge = judges.MTBenchChatBotResponseQuality(model=model_name)
+        self.judge = j.MTBenchChatBotResponseQuality(model=model_name)
 
     def _call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
         """Calls the MTBenchChatBotResponseQuality judge and formats the response.
@@ -191,18 +191,18 @@ class MTBenchChatBotResponseQuality(LLMJudgeStructured):
             )
         }
 
-class ReliableCIRelevance(MTBenchChatBotResponseQuality):
+class ReliableCIRelevanceWrapper(MTBenchChatBotResponseQualityWrapper):
     def __init__(self, model_name = "gpt-4.1-mini", temperature = 0, scale_min = 0, scale_max = 3):
         super().__init__(model_name=model_name, temperature=temperature, scale_min=scale_min, scale_max=scale_max)
         self.judge_name = f"ReliableCIRelevance-{model_name}"
         self.correct = scale_max
         self.incorrect = scale_min
-        self.judge = judges.ReliableCIRelevance(model=model_name)
+        self.judge = j.ReliableCIRelevance(model=model_name)
 
 
 JUDGES_MAP = {
     "LLMJudgeStructured": LLMJudgeStructured,
-    "PollMultihopCorrectness": PollMultihopCorrectness,
-    "MTBenchChatBotResponseQuality": MTBenchChatBotResponseQuality,
-    "ReliableCIRelevance": ReliableCIRelevance,
+    "PollMultihopCorrectness": PollMultihopCorrectnessWrapper,
+    "MTBenchChatBotResponseQuality": MTBenchChatBotResponseQualityWrapper,
+    "ReliableCIRelevance": ReliableCIRelevanceWrapper,
 }
