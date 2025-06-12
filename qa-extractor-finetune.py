@@ -6,12 +6,20 @@ Usage:
 Options:
     --model=<model_name>  Name of the model to fine-tune [default: deepset/deberta-v3-base-squad2]
 """
+
 import os
 from docopt import docopt
 from datasets import concatenate_datasets
-from transformers import AutoModelForQuestionAnswering, TrainingArguments, Trainer, AutoTokenizer, DefaultDataCollator
+from transformers import (
+    AutoModelForQuestionAnswering,
+    TrainingArguments,
+    Trainer,
+    AutoTokenizer,
+    DefaultDataCollator,
+)
 
 from src.data import load_repliqa
+
 
 def run(model_name):
     model = AutoModelForQuestionAnswering.from_pretrained(model_name)
@@ -19,17 +27,23 @@ def run(model_name):
 
     # Preprocess the RepliQA dataset.
     NOANSWER = "UNANSWERABLE"
-    repliqa_splits = [load_repliqa(split=i) for i in range(3)] # We exclude the test set (split 3).
+    repliqa_splits = [
+        load_repliqa(split=i) for i in range(3)
+    ]  # We exclude the test set (split 3).
     repliqa = concatenate_datasets(repliqa_splits)
 
     def filter_bad_answers(example):
         if example["answer"] != NOANSWER:
-            return example["long_answer"].lower() in example["document_extracted"].lower()
+            return (
+                example["long_answer"].lower() in example["document_extracted"].lower()
+            )
         return True
-        
+
     repliqa_filtered = repliqa.filter(filter_bad_answers)
     print(f"Filtered dataset size: {len(repliqa_filtered)}")
-    print(f"Unanswerable examples: {len(repliqa_filtered.filter(lambda x: x['answer'] == NOANSWER))}")
+    print(
+        f"Unanswerable examples: {len(repliqa_filtered.filter(lambda x: x['answer'] == NOANSWER))}"
+    )
 
     def preprocess_function(examples):
         questions = [q.strip() for q in examples["question"]]
@@ -74,7 +88,10 @@ def run(model_name):
                 context_end = idx - 1
 
                 # If the answer is not fully inside the context.
-                if offset[context_start][0] > end_char or offset[context_end][1] < start_char:
+                if (
+                    offset[context_start][0] > end_char
+                    or offset[context_end][1] < start_char
+                ):
                     print(f"Answer: {long_answer}.")
                     print(f"Document: {doc}.")
                     print(f"Context start: {context_start}, end: {context_end}.")
@@ -133,12 +150,15 @@ def run(model_name):
         data_collator=data_collator,
     )
 
-    trainer.train() #resume_from_checkpoint=True)
+    trainer.train()  # resume_from_checkpoint=True)
     trainer.save_model(f"models/{model_name.replace('/', '-')}-repliqa")
+
 
 if __name__ == "__main__":
     os.makedirs("models", exist_ok=True)
     args = docopt(__doc__)
     model_name = args["--model"] or "deepset/deberta-v3-base-squad2"
-    print(f"Fine-tuning model: {model_name}. Will save to models/{model_name.replace('/', '-')}-repliqa")
+    print(
+        f"Fine-tuning model: {model_name}. Will save to models/{model_name.replace('/', '-')}-repliqa"
+    )
     run(model_name)

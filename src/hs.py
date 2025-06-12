@@ -27,6 +27,7 @@ BASELINE_SUMMARIZER_PROMPT = dedent(
     """
 )
 
+
 class HighlighterOutput(BaseModel):
     highlighter_extracted: str | None = None
     highlighter_llm_response: str | None = None
@@ -34,21 +35,23 @@ class HighlighterOutput(BaseModel):
     highlighter_fuzzmatch_scores: list[float] | None = None
     highlighter_score: float | None = None
 
+
 class SummarizerOutput(BaseModel):
     answer_pred: str | None = None
     summarizer_llm_response: str | None = None
     summarizer_llm_guessed_question: str | None = None
 
+
 class HSBaselinePrediction(QAPrediction, HighlighterOutput, SummarizerOutput):
-    """Prediction made by the H&S pipeline.
-    """
+    """Prediction made by the H&S pipeline."""
+
     highlighter_model_name: str | None = None
     summarizer_model_name: str | None = None
 
 
 class HSBaseline(QAEvaluator):
-    """H&S based on two LLMs.
-    """
+    """H&S based on two LLMs."""
+
     def __init__(
         self,
         highlighter_model_name: str,
@@ -65,7 +68,7 @@ class HSBaseline(QAEvaluator):
             sleep_time_between_retrials=sleep_time_between_retrials,
             max_sleep_time_between_retrials=max_sleep_time_between_retrials,
         )
-        
+
         self.extractor_prompt = extractor_prompt
         self.summarizer_prompt = summarizer_prompt
         self.highlighter_model_name = highlighter_model_name
@@ -90,15 +93,23 @@ class HSBaseline(QAEvaluator):
             summarizer_model_name=self.summarizer_model_name,
             temperature=self.temperature,
         )
-        
-    def call_highlighter(self, context_str: str, question_str: str) -> HighlighterOutput:
+
+    def call_highlighter(
+        self, context_str: str, question_str: str
+    ) -> HighlighterOutput:
         """This highlighter uses an LLM to extract text from the context."""
-        model_response = query_llm(messages=[
-            {"role": "user", "content": self.extractor_prompt.format(
-                context=context_str,
-                question_str=question_str,
-            )}
-        ], temperature=self.temperature, model_name=self.highlighter_model_name,
+        model_response = query_llm(
+            messages=[
+                {
+                    "role": "user",
+                    "content": self.extractor_prompt.format(
+                        context=context_str,
+                        question_str=question_str,
+                    ),
+                }
+            ],
+            temperature=self.temperature,
+            model_name=self.highlighter_model_name,
         )
 
         # No response.
@@ -115,7 +126,7 @@ class HSBaseline(QAEvaluator):
         text_extracts = [extract.strip().lstrip("- ") for extract in text_extracts]
         if not text_extracts:
             return HighlighterOutput(highlighter_llm_response=model_response)
-        
+
         # Check if the text extracts are in the context.
         valid_text_extracts = []
         scores = []
@@ -123,7 +134,7 @@ class HSBaseline(QAEvaluator):
             scores.append(fuzz.partial_ratio(text_extract, context_str))
             if scores[-1] >= 95:
                 valid_text_extracts.append(text_extract)
-        
+
         valid_text = "\n".join(valid_text_extracts)
 
         return HighlighterOutput(
@@ -135,16 +146,24 @@ class HSBaseline(QAEvaluator):
 
     def call_summarizer(self, text_extract: str) -> SummarizerOutput:
         """This summarizer uses an LLM to summarize the text extract."""
+
         class LLMSummarizerOutput(BaseModel):
             guessed_question: str
             answer: str
 
-        model_response = query_llm(messages=[
-            {"role": "user", "content": self.summarizer_prompt.format(
-                text_extract=text_extract,
-            )}
-        ], temperature=self.temperature, model_name=self.summarizer_model_name,
-        response_format=LLMSummarizerOutput)
+        model_response = query_llm(
+            messages=[
+                {
+                    "role": "user",
+                    "content": self.summarizer_prompt.format(
+                        text_extract=text_extract,
+                    ),
+                }
+            ],
+            temperature=self.temperature,
+            model_name=self.summarizer_model_name,
+            response_format=LLMSummarizerOutput,
+        )
 
         if not model_response:
             return SummarizerOutput(
@@ -155,14 +174,23 @@ class HSBaseline(QAEvaluator):
 
         return SummarizerOutput(
             # Failed prediction if the LLM gives no answer.
-            answer_pred=model_response.answer if hasattr(model_response, "answer") else FAILED_PRED,
+            answer_pred=(
+                model_response.answer
+                if hasattr(model_response, "answer")
+                else FAILED_PRED
+            ),
             summarizer_llm_response=str(model_response),
-            summarizer_llm_guessed_question=model_response.guessed_question if hasattr(model_response, "guessed_question") else None,
+            summarizer_llm_guessed_question=(
+                model_response.guessed_question
+                if hasattr(model_response, "guessed_question")
+                else None
+            ),
         )
 
+
 class HSStructuredHighlighter(HSBaseline):
-    """Highlighter that uses structured output.
-    """
+    """Highlighter that uses structured output."""
+
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.extractor_prompt = dedent(
@@ -179,33 +207,41 @@ class HSStructuredHighlighter(HSBaseline):
             "{context}\n"
             "Question: {question_str}?\n"
         )
- 
-    def call_highlighter(self, context_str: str, question_str: str) -> HighlighterOutput:
+
+    def call_highlighter(
+        self, context_str: str, question_str: str
+    ) -> HighlighterOutput:
         """This highlither uses structured output to extract text from the context."""
+
         class LLMOutput(BaseModel):
             answer: str
             text_extracts: list[str]
 
-        model_response = query_llm(messages=[
-            {"role": "user", "content": self.extractor_prompt.format(
-                context=context_str,
-                question_str=question_str,
-            )}
-        ], temperature=self.temperature, model_name=self.highlighter_model_name,
-        response_format=LLMOutput)
+        model_response = query_llm(
+            messages=[
+                {
+                    "role": "user",
+                    "content": self.extractor_prompt.format(
+                        context=context_str,
+                        question_str=question_str,
+                    ),
+                }
+            ],
+            temperature=self.temperature,
+            model_name=self.highlighter_model_name,
+            response_format=LLMOutput,
+        )
 
         if not model_response:
-            return HighlighterOutput(
-                highlighter_llm_response=None
-            )
+            return HighlighterOutput(highlighter_llm_response=None)
 
         # Nothing to highlight.
         if not model_response.answer or NOANSWER_PRED in model_response.answer:
             return HighlighterOutput(highlighter_llm_response=str(model_response))
-        
+
         if not model_response.text_extracts:
             return HighlighterOutput(highlighter_llm_response=str(model_response))
-        
+
         # Check if the text extracts are in the context.
         valid_text_extracts = []
         scores = []
@@ -213,7 +249,7 @@ class HSStructuredHighlighter(HSBaseline):
             scores.append(fuzz.partial_ratio(text_extract, context_str))
             if scores[-1] >= 95:
                 valid_text_extracts.append(text_extract)
-        
+
         valid_text = "\n".join(valid_text_extracts)
 
         return HighlighterOutput(
@@ -223,9 +259,10 @@ class HSStructuredHighlighter(HSBaseline):
             highlighter_fuzzmatch_scores=scores,
         )
 
+
 class HSBERTExtractor(HSBaseline):
-    """Highlighter that uses a BERT-based extractor.
-    """
+    """Highlighter that uses a BERT-based extractor."""
+
     def __init__(self, highlighter_threshold=0.3, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         try:
@@ -234,16 +271,21 @@ class HSBERTExtractor(HSBaseline):
                 model=self.highlighter_model_name,
                 handle_impossible_answer=True,
                 max_answer_len=100,
-                max_question_len=100
+                max_question_len=100,
             )
         except OSError as e:
-            raise ValueError(f"Failed to load the highlighter model '{self.highlighter_model_name}'. Is it there?")
+            raise ValueError(
+                f"Failed to load the highlighter model '{self.highlighter_model_name}'. Is it there?"
+            )
         self.highlighter_threshold = highlighter_threshold
         # In case this hasn't been downloaded yet.
         import nltk
-        nltk.download('punkt_tab', quiet=True)
 
-    def call_highlighter(self, context_str: str, question_str: str) -> HighlighterOutput:
+        nltk.download("punkt_tab", quiet=True)
+
+    def call_highlighter(
+        self, context_str: str, question_str: str
+    ) -> HighlighterOutput:
         """This highlighter uses a BERT-based extractor to extract text from the context."""
         try:
             model_response = self.extractor(
@@ -252,29 +294,32 @@ class HSBERTExtractor(HSBaseline):
             )
         except Exception as e:
             print(f"Error in call_highlighter: {e}")
-            return HighlighterOutput(
-                highlighter_llm_response=f"Error: {e}"
-            )
+            return HighlighterOutput(highlighter_llm_response=f"Error: {e}")
 
         # Nothing to highlight.
-        if model_response['score'] < self.highlighter_threshold or not model_response['answer'].strip():
+        if (
+            model_response["score"] < self.highlighter_threshold
+            or not model_response["answer"].strip()
+        ):
             return HighlighterOutput(
                 highlighter_extracted=None,
-                highlighter_score=model_response['score'],
-                highlighter_llm_response=model_response['answer'],
+                highlighter_score=model_response["score"],
+                highlighter_llm_response=model_response["answer"],
             )
 
         # We return the full sentence that contains the answer.
         context = context_str.replace("\n", " ")
         for s in sentences(context):
-            if s in context[model_response["start"]:]:
+            if s in context[model_response["start"] :]:
                 extracted_sentence = s
                 break
         else:
-            raise ValueError("No sentence found containing the answer. This looks like a logical error in the code.")
+            raise ValueError(
+                "No sentence found containing the answer. This looks like a logical error in the code."
+            )
 
         return HighlighterOutput(
             highlighter_extracted=extracted_sentence.strip(),
-            highlighter_score=model_response['score'],
-            highlighter_llm_response=model_response['answer'],
+            highlighter_score=model_response["score"],
+            highlighter_llm_response=model_response["answer"],
         )

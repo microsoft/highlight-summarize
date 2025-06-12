@@ -18,6 +18,7 @@ PIPELINE_MAP = {
     "HSBERTExtractor": HSBERTExtractor,
 }
 
+
 def run_id(experiment_config, dataset_name):
     """Generate a unique run ID for the experiment based on its configuration and dataset name.
     The run ID is also the directory where the results will be stored.
@@ -34,9 +35,9 @@ def run_id(experiment_config, dataset_name):
         f"-{experiment_config['highlighter_model_name']}-{experiment_config['summarizer_model_name']}"
     )
 
+
 def load_config(path):
-    """Load the experiment configuration from a YAML file.
-    """
+    """Load the experiment configuration from a YAML file."""
     with open(path, "r") as f:
         config = yaml.safe_load(f)
     # Experiments are repeated for each dataset.
@@ -51,6 +52,7 @@ def load_config(path):
 
     return config
 
+
 def run_inference(run_id, experiment_config, max_threads) -> datasets.Dataset:
     """Run the inference for a given experiment configuration.
     This function would typically call the actual inference logic.
@@ -63,7 +65,9 @@ def run_inference(run_id, experiment_config, max_threads) -> datasets.Dataset:
             print(f"    > Skipping inference for {run_id} as results already exist.")
             return prediction_dataset
         else:
-            raise Exception(f"{run_id}: This shouldn't happen: missing 'answer_pred' column but dataset exists.")
+            raise Exception(
+                f"{run_id}: This shouldn't happen: missing 'answer_pred' column but dataset exists."
+            )
 
     print(f"    > Running inference for {run_id}.")
     print(f"    > Loading dataset {experiment_config['dataset']}.")
@@ -75,14 +79,14 @@ def run_inference(run_id, experiment_config, max_threads) -> datasets.Dataset:
         raise ValueError(f"Pipeline {experiment_config['pipeline']} is not supported.")
     if experiment_config["pipeline"] == "QAEvaluator":
         pipeline = pipeline_cls(
-                    model_name=experiment_config["model_name"],
-                    temperature=experiment_config["temperature"],
+            model_name=experiment_config["model_name"],
+            temperature=experiment_config["temperature"],
         )
     else:
         pipeline = pipeline_cls(
-                    highlighter_model_name=experiment_config["highlighter_model_name"],
-                    summarizer_model_name=experiment_config["summarizer_model_name"],
-                    temperature=experiment_config["temperature"],
+            highlighter_model_name=experiment_config["highlighter_model_name"],
+            summarizer_model_name=experiment_config["summarizer_model_name"],
+            temperature=experiment_config["temperature"],
         )
 
     # Run.
@@ -95,8 +99,10 @@ def run_inference(run_id, experiment_config, max_threads) -> datasets.Dataset:
     elapsed_time = time.time() - now
 
     with open(f"{run_id}/run.txt", "w") as f:
-        f.write(f"Elapsed time for predictions: {elapsed_time:.2f} seconds. Average: {elapsed_time / len(dataset):.2f} seconds per example.")
-    
+        f.write(
+            f"Elapsed time for predictions: {elapsed_time:.2f} seconds. Average: {elapsed_time / len(dataset):.2f} seconds per example."
+        )
+
     # Store.
     print(f"    > Storing predictions to {dst_dir}.")
     prediction_dataset.save_to_disk(dst_dir)
@@ -104,7 +110,12 @@ def run_inference(run_id, experiment_config, max_threads) -> datasets.Dataset:
     return prediction_dataset
 
 
-def run_judgement(run_id: str, prediction_dataset: datasets.Dataset, judges_config: dict, max_threads: int) -> datasets.Dataset:
+def run_judgement(
+    run_id: str,
+    prediction_dataset: datasets.Dataset,
+    judges_config: dict,
+    max_threads: int,
+) -> datasets.Dataset:
     """Run the judgement for a given experiment configuration.
     This function would typically call the actual judgement logic.
     """
@@ -112,7 +123,9 @@ def run_judgement(run_id: str, prediction_dataset: datasets.Dataset, judges_conf
     dst_dir = f"{run_id}/judgement"
     # Try to load the existing results.
     if os.path.exists(dst_dir):
-        print(f"    > Skipping judgement for {run_id} as results already exist in {dst_dir}.")
+        print(
+            f"    > Skipping judgement for {run_id} as results already exist in {dst_dir}."
+        )
         judged_dataset = datasets.load_from_disk(dst_dir)
         # Check that all judges are present.
         for judge_name in judges:
@@ -121,7 +134,9 @@ def run_judgement(run_id: str, prediction_dataset: datasets.Dataset, judges_conf
                 if judge_name in column_name:
                     break
             else:
-                raise ValueError(f"Judge {judge_name} is missing from the dataset {run_id}. Delete the directory to rerun the judgement.")
+                raise ValueError(
+                    f"Judge {judge_name} is missing from the dataset {run_id}. Delete the directory to rerun the judgement."
+                )
         return judged_dataset
 
     # Run.
@@ -146,9 +161,9 @@ def run_judgement(run_id: str, prediction_dataset: datasets.Dataset, judges_conf
 
     return judged_dataset
 
+
 def load_all_results(results_dir="results/") -> dict[str, Any]:
-    """Load all results from the results directory.
-    """
+    """Load all results from the results directory."""
     results = {}
     for dataset_name in os.listdir(results_dir):
         dataset_path = os.path.join(results_dir, dataset_name)
@@ -159,7 +174,9 @@ def load_all_results(results_dir="results/") -> dict[str, Any]:
                 if os.path.isdir(run_id):
                     if not os.path.exists(os.path.join(run_id, "experiment.yaml")):
                         continue
-                    config = yaml.safe_load(open(os.path.join(run_id, "experiment.yaml"), "r"))
+                    config = yaml.safe_load(
+                        open(os.path.join(run_id, "experiment.yaml"), "r")
+                    )
                     judgement_dir = os.path.join(run_id, "judgement")
                     if os.path.exists(judgement_dir):
                         # Load the judgement results.
