@@ -18,12 +18,9 @@ load_dotenv()
 endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
 
 
-def query_llm(
-    messages: list[dict[str, str]], temperature, model_name: str, response_format=None
-):
-    # We create a new client for each query. While not ideal, this
-    # avoids some connection leak issues that have been occurring.
-    with AzureOpenAI(
+# We initialize every time to make the most of HF's caching.
+def openai_client() -> AzureOpenAI:
+    return AzureOpenAI(
         api_version="2024-12-01-preview",
         azure_endpoint=endpoint,
         azure_ad_token_provider=get_bearer_token_provider(
@@ -31,23 +28,31 @@ def query_llm(
         ),
         timeout=OPENAI_TIMEOUT,
         max_retries=OPENAI_RETRIES,
-    ) as client:
-        # Structured output: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/structured-outputs?tabs=python-secure%2Cdotnet-entra-id&pivots=programming-language-python.
-        model_response = client.beta.chat.completions.parse(
-            messages=messages,
-            temperature=temperature,
-            model=model_name,
-            response_format=response_format or NOT_GIVEN,
-        )
+    )
 
-        if (
-            not model_response
-            or not model_response.choices
-            or not model_response.choices[0]
-        ):
-            return None
 
-        if response_format is None:
-            return model_response.choices[0].message.content
+def query_llm(
+    messages: list[dict[str, str]], temperature, model_name: str, response_format=None
+):
+    # We create a new client for each query. While not ideal, this
+    # avoids some connection leak issues that have been occurring.
+    client = openai_client()
+    # Structured output: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/structured-outputs?tabs=python-secure%2Cdotnet-entra-id&pivots=programming-language-python.
+    model_response = client.beta.chat.completions.parse(
+        messages=messages,
+        temperature=temperature,
+        model=model_name,
+        response_format=response_format or NOT_GIVEN,
+    )
 
-        return model_response.choices[0].message.parsed
+    if (
+        not model_response
+        or not model_response.choices
+        or not model_response.choices[0]
+    ):
+        return None
+
+    if response_format is None:
+        return model_response.choices[0].message.content
+
+    return model_response.choices[0].message.parsed
