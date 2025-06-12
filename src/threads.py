@@ -43,6 +43,7 @@ def mt_exec(example: dict, function: callable) -> dict:
     counter.update(running=1)
 
     wait_seconds = 1
+    error = None
     while wait_seconds <= 32:
         try:
             res = function(example)
@@ -59,6 +60,8 @@ def mt_exec(example: dict, function: callable) -> dict:
 
     # We were killed by the rate limit. Won't try anymore.
     print("Failed after trying for more than 1 minute.")
+    if error:
+        print(f"Last error: {error}")
     counter.update(failed=1, running=-1)
     return {}
 
