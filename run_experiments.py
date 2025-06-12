@@ -104,7 +104,7 @@ def run_inference(run_id, experiment_config, max_threads) -> datasets.Dataset:
     return prediction_dataset
 
 
-def run_judgement(run_id, prediction_dataset, judges_config, max_threads) -> datasets.Dataset:
+def run_judgement(run_id: str, prediction_dataset: datasets.Dataset, judges_config: dict, max_threads: int) -> datasets.Dataset:
     """Run the judgement for a given experiment configuration.
     This function would typically call the actual judgement logic.
     """
@@ -125,7 +125,7 @@ def run_judgement(run_id, prediction_dataset, judges_config, max_threads) -> dat
         return judged_dataset
 
     # Run.
-    judged_dataset = prediction_dataset
+    judged_dataset = prediction_dataset.to_list()
     for judge_name in judges:
         judge_cls = JUDGES_MAP.get(judge_name)
         if judge_cls is None:
