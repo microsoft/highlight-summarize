@@ -1,4 +1,4 @@
-import judges as j
+import judges as judges_lib
 from textwrap import dedent
 from typing import Any
 from pydantic import BaseModel
@@ -153,7 +153,7 @@ def patched_get_completion(
     )
 
 
-j.base.get_completion = patched_get_completion
+judges_lib.base.get_completion = patched_get_completion
 # End of the hack.
 ####################################################################################
 
@@ -171,7 +171,7 @@ class PollMultihopCorrectnessWrapper(LLMJudgeStructured):
         self.judge_name = f"PollMultihopCorrectness-{model_name}"
         self.correct = True
         self.incorrect = False
-        self.judge = j.PollMultihopCorrectness(model=model_name)
+        self.judge = judges_lib.PollMultihopCorrectness(model=model_name)
 
     def call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
         """Calls the PollMultihopCorrectness judge and formats the response."""
@@ -199,7 +199,7 @@ class MTBenchChatBotResponseQualityWrapper(LLMJudgeStructured):
         self.judge_name = f"MTBenchChatBotResponseQuality-{model_name}"
         self.correct = scale_max
         self.incorrect = scale_min
-        self.judge = j.MTBenchChatBotResponseQuality(model=model_name)
+        self.judge = judges_lib.MTBenchChatBotResponseQuality(model=model_name)
 
     def call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
         """Calls the MTBenchChatBotResponseQuality judge and formats the response."""
@@ -227,7 +227,7 @@ class ReliableCIRelevanceWrapper(MTBenchChatBotResponseQualityWrapper):
         self.judge_name = f"ReliableCIRelevance-{model_name}"
         self.correct = scale_max
         self.incorrect = scale_min
-        self.judge = j.ReliableCIRelevance(model=model_name)
+        self.judge = judges_lib.ReliableCIRelevance(model=model_name)
 
 
 JUDGES_MAP = {
