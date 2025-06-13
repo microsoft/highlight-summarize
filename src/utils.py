@@ -1,4 +1,5 @@
 import os
+import gc
 import sys
 import logging
 from openai import AzureOpenAI, NOT_GIVEN
@@ -30,13 +31,11 @@ def openai_client() -> AzureOpenAI:
         max_retries=OPENAI_RETRIES,
     )
 
+client = openai_client()
 
 def query_llm(
     messages: list[dict[str, str]], temperature, model_name: str, response_format=None
 ):
-    # We create a new client for each query. While not ideal, this
-    # avoids some connection leak issues that have been occurring.
-    client = openai_client()
     # Structured output: https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/structured-outputs?tabs=python-secure%2Cdotnet-entra-id&pivots=programming-language-python.
     model_response = client.beta.chat.completions.parse(
         messages=messages,
