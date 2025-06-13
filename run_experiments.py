@@ -150,6 +150,12 @@ def run_judgement(
             model_name=judges_config["model_name"],
             temperature=judges_config["temperature"],
         )
+        # d = []
+        # from tqdm import tqdm
+        # for e in tqdm(judged_dataset):
+        #     d.append(judge(e))
+        # judged_dataset = datasets.Dataset.from_list(d)
+
         judged_dataset = mt_map(
             function=judge,
             dataset=judged_dataset,
