@@ -175,15 +175,18 @@ def load_all_results(results_dir="results/") -> dict[str, Any]:
             if not os.path.isdir(os.path.join(results_dir, dataset_name, pipeline_name)):
                 continue
             run_id = os.path.join(dataset_name, pipeline_name)
-            print(f"Processing run: {run_id}")
             dirname = os.path.join(results_dir, run_id, "judgement")
             if not os.path.isdir(dirname):
                 print(f"Skipping {run_id} as {dirname} doesn't exist.")
                 continue
             try:
-                judged_results[run_id] = datasets.load_from_disk(dirname)
+                res = datasets.load_from_disk(dirname)
             except Exception as e:
                 print(f"Error loading {run_id} from {dirname}: {e}")
+
+            if dataset_name not in judged_results:
+                judged_results[dataset_name] = {}
+            judged_results[dataset_name][pipeline_name] = res
 
     return judged_results
 
