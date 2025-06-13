@@ -32,7 +32,8 @@ def run_id(experiment_config, dataset_name):
     return (
         f"{experiment_config['results_dir']}/"
         f"{dataset_name}/{experiment_config['pipeline']}"
-        f"-{experiment_config['highlighter_model_name']}-{experiment_config['summarizer_model_name']}"
+        f"-{experiment_config['highlighter_model_name'].replace('/', '_')}"
+        f"-{experiment_config['summarizer_model_name']}"
     )
 
 
@@ -150,11 +151,6 @@ def run_judgement(
             model_name=judges_config["model_name"],
             temperature=judges_config["temperature"],
         )
-        # d = []
-        # from tqdm import tqdm
-        # for e in tqdm(judged_dataset):
-        #     d.append(judge(e))
-        # judged_dataset = datasets.Dataset.from_list(d)
 
         judged_dataset = mt_map(
             function=judge,
@@ -170,30 +166,26 @@ def run_judgement(
 
 def load_all_results(results_dir="results/") -> dict[str, Any]:
     """Load all results from the results directory."""
-    results = {}
+    judged_results = {}
     for dataset_name in os.listdir(results_dir):
-        dataset_path = os.path.join(results_dir, dataset_name)
-        if os.path.isdir(dataset_path):
-            print(f"[*] Loading results for dataset: {dataset_name}")
-            for pipeline_name in os.listdir(dataset_path):
-                run_id = os.path.join(dataset_path, pipeline_name)
-                if os.path.isdir(run_id):
-                    if not os.path.exists(os.path.join(run_id, "experiment.yaml")):
-                        continue
-                    config = yaml.safe_load(
-                        open(os.path.join(run_id, "experiment.yaml"), "r")
-                    )
-                    judgement_dir = os.path.join(run_id, "judgement")
-                    if os.path.exists(judgement_dir):
-                        # Load the judgement results.
-                        judged = datasets.load_from_disk(judgement_dir)
-                        results[run_id] = {
-                            "config": config,
-                            "judged_dataset": judged,
-                        }
-                    else:
-                        print("Skipping run_id as no judgement results found:", run_id)
-    return results
+        if not os.path.isdir(os.path.join(results_dir, dataset_name)):
+            continue
+        print(f"Processing dataset: {dataset_name}")
+        for pipeline_name in os.listdir(os.path.join(results_dir, dataset_name)):
+            if not os.path.isdir(os.path.join(results_dir, dataset_name, pipeline_name)):
+                continue
+            run_id = os.path.join(dataset_name, pipeline_name)
+            print(f"Processing run: {run_id}")
+            dirname = os.path.join(results_dir, run_id, "judgement")
+            if not os.path.isdir(dirname):
+                print(f"Skipping {run_id} as {dirname} doesn't exist.")
+                continue
+            try:
+                judged_results[run_id] = datasets.load_from_disk(dirname)
+            except Exception as e:
+                print(f"Error loading {run_id} from {dirname}: {e}")
+
+    return judged_results
 
 
 if __name__ == "__main__":
