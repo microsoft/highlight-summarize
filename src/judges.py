@@ -13,7 +13,8 @@ class LLMJudgeResponse(BaseModel):
 
 class LLMJudgeStructured:
     def __init__(
-        self, model_name="gpt-4.1-mini", temperature=0, scale_min=1, scale_max=10
+        self, model_name="gpt-4.1-mini", temperature=0, scale_min=1, scale_max=10,
+        factors=["correctness", "faithfulness", "naturalness"]
     ):
         self.judge_name = f"LLMJudgeStructured-{model_name}"
         self.model_name = model_name
@@ -36,7 +37,7 @@ class LLMJudgeStructured:
             {output}
             [The End of Assistant's Answer]"""
         )
-        self.factors = ["correctness", "faithfulness", "naturalness"]
+        self.factors = factors
         # This can be overridden by the judge.
         self.correct = scale_max
         self.incorrect = scale_min
@@ -167,6 +168,7 @@ class PollMultihopCorrectnessWrapper(LLMJudgeStructured):
             temperature=temperature,
             scale_min=scale_min,
             scale_max=scale_max,
+            factors=["correctness"],
         )
         self.judge_name = f"PollMultihopCorrectness-{model_name}"
         self.correct = True
@@ -195,6 +197,7 @@ class MTBenchChatBotResponseQualityWrapper(LLMJudgeStructured):
             temperature=temperature,
             scale_min=scale_min,
             scale_max=scale_max,
+            factors=["quality"],
         )
         self.judge_name = f"MTBenchChatBotResponseQuality-{model_name}"
         self.correct = scale_max
@@ -208,7 +211,7 @@ class MTBenchChatBotResponseQualityWrapper(LLMJudgeStructured):
 
         # Format response.
         return {
-            "correctness": LLMJudgeResponse(
+            "quality": LLMJudgeResponse(
                 rating=int(model_response.score), explanation=model_response.reasoning
             )
         }
