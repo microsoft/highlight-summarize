@@ -50,7 +50,7 @@ def mt_exec(example: dict, function: callable) -> dict:
             counter.update(running=-1)
             return res
         except Exception as e:
-            pass
+            error = e
 
         # Wait.
         counter.update(waiting=1)
