@@ -1,11 +1,18 @@
 import random
+from enum import Enum
 from textwrap import dedent
 from pydantic import BaseModel
 
 from .utils import query_llm
 
+class ResponseChoice(Enum):
+    response_1 = "1"
+    response_2 = "2"
+    tie = "tie"
+    neither = "neither"
+
 class JudgeResponse(BaseModel):
-    response_id: int | None
+    preference: ResponseChoice
     explanation: str
 
 class ComparisonJudge:
@@ -20,6 +27,8 @@ class ComparisonJudge:
             such as the correctness, faithfulness, and the naturalness of
             the response. Begin your evaluation by providing a short explanation. Be as objective as
             possible. After providing your explanation, select the response that you think is better.
+            If you think both responses are equally good, select "tie". If you think both responses are equally bad,
+            select "neither".
             [Question]
             {input}
             [Response 1]
@@ -50,14 +59,11 @@ class ComparisonJudge:
             response_format=JudgeResponse,
         )
 
-        if not model_response.response_id in [1, 2]:
-            return JudgeResponse(
-                response_id=None,
-                explanation="Error: Invalid response ID. Expected 1 or 2, got {}. Explanation: {}".format(
-                    model_response.response_id, model_response.explanation),
-            )
-
+        # If inverted, swap the responses.
         if inverted:
-            model_response.response_id = 1 if model_response.response_id == 2 else 2
+            if model_response.preference == ResponseChoice.response_1:
+                model_response.preference = ResponseChoice.response_2
+            elif model_response.preference == ResponseChoice.response_2:
+                model_response.preference = ResponseChoice.response_1
 
         return model_response
