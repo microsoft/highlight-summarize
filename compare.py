@@ -23,7 +23,7 @@ import pandas as pd
 from tqdm import tqdm
 from docopt import docopt
 
-from src.comparison_judge import ComparisonJudge
+from src.comparison_judge import ComparisonJudge, ResponseChoice, JudgeResponse
 
 def get_run_info(run_folder):
     """Extracts the base folder, dataset name and pipeline from the run folder."""
@@ -44,6 +44,19 @@ def load_from_run(run_folder):
     if not os.path.exists(os.path.join(run_folder, "inference")):
         raise ValueError(f"Run folder does not contain 'inference' directory: {run_folder}. You should run `run_experiments.py` first.")
     return datasets.load_from_disk(os.path.join(run_folder, "inference"))
+
+def parse_judge_preference(response: JudgeResponse, option_1: str, option_2: str) -> str:
+    """Parses the judge's response and returns the preferred option."""
+    if response.preference == ResponseChoice.response_1:
+        return option_1
+    elif response.preference == ResponseChoice.response_2:
+        return option_2
+    elif response.preference == ResponseChoice.tie:
+        return "tie"
+    elif response.preference == ResponseChoice.neither:
+        return "neither"
+    else:
+        return "Error: unknown preference"
 
 def pairwise_comparison(run_folder_1, run_folder_2):
     """Compares the pairwise answers produced by two runs."""
@@ -71,14 +84,15 @@ def pairwise_comparison(run_folder_1, run_folder_2):
             continue
         output_1 = example1["answer_pred"]
         output_2 = example2["answer_pred"]
-        result = judge(question, output_1, output_2)
+        response = judge(question, output_1, output_2)
+
         compared.append({
             "dataset_name": dataset_name_1,
             "question": question,
             f"{pipeline_1}-output": output_1,
             f"{pipeline_2}-output": output_2,
-            "preference": pipeline_1 if result.response_id == 1 else pipeline_2,
-            "explanation": result.explanation,
+            "preference": parse_judge_preference(response, pipeline_1, pipeline_2),
+            "explanation": response.explanation,
         })
     fname = os.path.join(base_folder_1, dataset_name_1, f'comparison-{pipeline_1}_vs_{pipeline_2}.jsonl')
     print(f"Saving comparison results to {fname}")
@@ -125,15 +139,16 @@ if __name__ == "__main__":
         compared = []
 
         for example in tqdm(dataset):
-            result = judge(example["question"], example["answer_pred"], example["highlighter_extracted"])
+            response = judge(example["question"], example["answer_pred"], example["highlighter_extracted"])
+
             compared.append({
                 "dataset_name": dataset_name,
                 "pipeline": pipeline,
                 "question": example["question"],
                 "hs-output": example["answer_pred"],
                 "highlighter-output": example["highlighter_extracted"],
-                "preference": "hs" if result.response_id == 1 else "highlighter",
-                "explanation": result.explanation,
+                "preference": parse_judge_preference(response, "hs", "highlighter"),
+                "explanation": response.explanation,
             })
         fname = os.path.join(base_folder, dataset_name, f'comparison-{pipeline}-highlighter_vs_hs.jsonl')
         print(f"Saving comparison results to {fname}")
