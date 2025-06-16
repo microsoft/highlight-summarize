@@ -70,6 +70,11 @@ def pairwise_comparison(run_folder_1, run_folder_2):
     if pipeline_1 == pipeline_2:
         raise ValueError("Pipelines must be different: {} vs {}".format(pipeline_1, pipeline_2))
 
+    fname = os.path.join(base_folder_1, dataset_name_1, f'comparison-{pipeline_1}_vs_{pipeline_2}.jsonl')
+    if os.path.exists(fname):
+        print(f"Comparison file already exists: {fname}. Skipping.")
+        return
+
     # Load the datasets from the run folders.
     dataset_1 = load_from_run(run_folder_1)
     dataset_2 = load_from_run(run_folder_2)
@@ -94,7 +99,7 @@ def pairwise_comparison(run_folder_1, run_folder_2):
             "preference": parse_judge_preference(response, pipeline_1, pipeline_2),
             "explanation": response.explanation,
         })
-    fname = os.path.join(base_folder_1, dataset_name_1, f'comparison-{pipeline_1}_vs_{pipeline_2}.jsonl')
+    
     print(f"Saving comparison results to {fname}")
     pd.DataFrame(compared).to_json(fname, lines=True, orient="records")
       
@@ -112,6 +117,9 @@ if __name__ == "__main__":
         # Run the comparisons, one thread each.
         print(f"Found {len(pipelines)} pipelines in folder '{folder}'.")
         max_threads = len(pipelines) * (len(pipelines) - 1) // 2
+        # Fixes an issue with tqdm: https://github.com/tqdm/tqdm/issues/457
+        tqdm(disable=True, total=0)
+
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
             to_run = []
             for i in range(len(pipelines)):
@@ -133,6 +141,11 @@ if __name__ == "__main__":
         print(f"Comparing highlighter output for dataset '{dataset_name}' and pipeline '{pipeline}'.")
         dataset = load_from_run(run_folder)
 
+        fname = os.path.join(base_folder, dataset_name, f'comparison-{pipeline}-highlighter_vs_hs.jsonl')
+        if os.path.exists(fname):
+            print(f"Comparison file already exists: {fname}. Skipping.")
+            exit(0)
+
         if not "highlighter_extracted" in dataset.column_names:
             raise ValueError("Dataset does not contain 'highlighter_extracted' column.")
 
@@ -150,7 +163,7 @@ if __name__ == "__main__":
                 "preference": parse_judge_preference(response, "hs", "highlighter"),
                 "explanation": response.explanation,
             })
-        fname = os.path.join(base_folder, dataset_name, f'comparison-{pipeline}-highlighter_vs_hs.jsonl')
+
         print(f"Saving comparison results to {fname}")
         pd.DataFrame(compared).to_json(fname, lines=True, orient="records")
     else:
