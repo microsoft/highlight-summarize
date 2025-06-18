@@ -20,3 +20,5 @@ tiktoken
 sentencepiece
 text_chunker
 nltk
+fschat==0.2.36
+plotly
