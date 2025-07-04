@@ -1,11 +1,13 @@
 from rapidfuzz import fuzz
 from textwrap import dedent
 from pydantic import BaseModel
-from transformers import pipeline
-from text_chunker import sentences
 
 from .qa import QAEvaluator, QAPrediction
 from .utils import NOANSWER_PRED, FAILED_PRED, query_llm
+
+# These modules are lazy-loaded to speed up imports.
+pipeline = None
+sentences = None
 
 BASELINE_EXTRACTOR_PROMPT = dedent(
     "You are an expert research assistant."
@@ -275,6 +277,12 @@ class HSBERTExtractor(HSBaseline):
 
     def __init__(self, highlighter_threshold=0.3, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
+        # Lazy loading.
+        if not pipeline:
+            from transformers import pipeline
+        if not sentences:
+            from text_chunker import sentences
+
         try:
             self.extractor = pipeline(
                 "question-answering",
