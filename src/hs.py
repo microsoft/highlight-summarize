@@ -61,6 +61,7 @@ class HSBaseline(QAEvaluator):
         max_sleep_time_between_retrials: float = 600.0,
         extractor_prompt: str = BASELINE_EXTRACTOR_PROMPT,
         summarizer_prompt: str = BASELINE_SUMMARIZER_PROMPT,
+        min_highlighted_words: int | None = None,
     ) -> None:
         super().__init__(
             model_name=None,
@@ -73,6 +74,7 @@ class HSBaseline(QAEvaluator):
         self.summarizer_prompt = summarizer_prompt
         self.highlighter_model_name = highlighter_model_name
         self.summarizer_model_name = summarizer_model_name
+        self.min_highlighted_words = min_highlighted_words
 
     def call_model(self, context_str: str, question_str: str) -> HSBaselinePrediction:
         highlighted = self.call_highlighter(context_str, question_str)
@@ -80,6 +82,14 @@ class HSBaseline(QAEvaluator):
         if not highlighted.highlighter_extracted:
             return HSBaselinePrediction(
                 # Refuse to answer (no highlight).
+                answer_pred=NOANSWER_PRED,
+                **highlighted.model_dump(),
+            )
+
+        # Should prevent some attacks.
+        if self.min_highlighted_words and len(highlighted.highlighter_extracted.split()) < self.min_highlighted_words:
+            return HSBaselinePrediction(
+                # Refuse to answer (not enough words highlighted).
                 answer_pred=NOANSWER_PRED,
                 **highlighted.model_dump(),
             )
