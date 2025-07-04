@@ -2,7 +2,7 @@ import os
 import base64
 import streamlit as st
 
-CONTENTS_DIR = "contents"
+CONTENTS_DIR = "demo/contents"
 def load_content(fname, mode="r"):
     """Load content from a file in the contents directory."""
     with open(os.path.join(CONTENTS_DIR, fname), mode) as f:
