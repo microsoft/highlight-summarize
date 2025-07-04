@@ -1,23 +1,29 @@
 import sys
 import streamlit as st
 
+from utils import load_content
 sys.path.append("..")
 from src.hs import HSStructuredHighlighter
 
-
+#################################
+# H&S and data.
+#################################
 hs = HSStructuredHighlighter(
-    highlighter_model_name="gpt-4.1-mini",
-    summarizer_model_name="gpt-4.1-mini",
-    min_highlighted_words=15,
-)
+        highlighter_model_name="gpt-4.1-mini",
+        summarizer_model_name="gpt-4.1-mini",
+        min_highlighted_words=15,
+    )
 
-from about import load_content
+# "RAG" document.
 doc = load_content("highlight_summarize.txt").strip()
 if not doc.strip:
     raise ValueError("The document is empty. Please provide a valid document.")
 detective = load_content("detective.png", mode="rb")
 
 
+#################################
+# Page.
+#################################
 st.title("💬 Highlight&Summarize")
 st.caption("🚀 A demo of H&S, which can answer questions about H&S!")
 
