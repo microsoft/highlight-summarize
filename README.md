@@ -23,3 +23,7 @@ as a judge.
 In particular:
 - compare between highlighter vs HS: `python compare.py highlighter <run_folder>`. E.g., `python compare.py highlighter results/repliqa_3/HSBaseline-gpt-4.1-mini-gpt-4.1-mini`.
 - compare the pipelines pairwise: `python compare.py pairwise <dataset results folder>`. E.g., `python compare.py pairwise results/repliqa_3`.
+
+## H&S Demo app
+
+To run it, after installing the `pip` dependencies, run `bash run.sh`.
