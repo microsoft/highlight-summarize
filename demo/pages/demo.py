@@ -29,7 +29,7 @@ st.caption("🚀 A demo of H&S, which can answer questions about H&S!")
 
 
 if "messages" not in st.session_state:
-    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+    st.session_state["messages"] = [{"role": "assistant", "content": "Hi! I can answer questions about H&S. If there's something I don't know, I'll just say so. How can I help you?"}]
 
 for msg in st.session_state.messages:
     st.chat_message(msg["role"]).write(msg["content"])
@@ -50,7 +50,7 @@ if prompt := st.chat_input():
     ]
     for line in lines:
         md += f":blue[{line}]\n\n"
-    with st.expander("See the inner workings of H&S", expanded=False):
+    with st.expander("See the intermediate outputs in H&S", expanded=False):
         st.chat_message(name="detective", avatar=detective).write(md)
     st.session_state.messages.append({"role": "detective", "content": md})
 
