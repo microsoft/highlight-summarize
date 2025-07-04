@@ -1,4 +1,5 @@
-
+Title: Highlight, then Summarize: RAG without the jailbreaks.
+Authors: Giovanni Cherubin (Microsoft), Andrew Paverd (Microsoft)
 
 Preventing model hijacking and jailbreaking is a troublesome problem in the deployment of Large Language Models (LLMs). In RAG
 systems, for example, malicious users can tamper with the LLM’s
@@ -23,20 +24,6 @@ and utility implications of this design pattern. To our surprise, the
 responses given by an H&S pipeline are comparable to, and often
 of better quality than, those coming from a vanilla RAG pipeline.
 
-ACM Reference Format:
-[Author(s)]. 2025. Highlight, then Summarize: RAG without the jailbreaks.
-In [Conference Name]. ACM, New York, NY, USA, 11 pages.
-https://doi.org/10.1145/nnnnnnn.nnnnnnn
-
-Permission to make digital or hard copies of all or part of this work for personal
-or classroom use is granted without fee provided that copies are not made or
-distributed for profit or commercial advantage, and that copies bear this notice
-and the full citation on the first page. Copyrights for components of this work
-owned by others must be honored. Abstracting with credit is permitted. To copy
-otherwise, or republish, to post on servers, or to redistribute to lists, requires
-prior specific permission and/or a fee. Request permissions from permissions@
-acm.org. Conference’17, Washington, DC, USA. © 2025 Copyright held by the
-owner/author(s). Publication rights licensed to ACM.
 
 1 Introduction
 
