@@ -1,0 +1,210 @@
+
+
+Preventing model hijacking and jailbreaking is a troublesome problem in the deployment of Large Language Models (LLMs). In RAG
+systems, for example, malicious users can tamper with the LLM’s
+inference and force it to produce undesired contents, beyond what
+was initially envisioned by system designers. Several mitigations
+rely on content classifiers, but these are mostly of a reactive nature;
+an ideal jailbreak classifier would need to understand what it means
+for something to be malicious, which is out of reach from a scientific
+and philosophical standpoint for the foreseeable future.
+
+In this paper, we look at a simple enhancement to RAG systems
+that prevents these attacks by design. The idea behind this design
+pattern, which we refer to as Highlight & Summarize (H&S), is
+to accomplish the same goal as a RAG pipeline (i.e., to provide
+natural language answers to questions based on relevant sources)
+without ever letting the LLM generator be directly exposed to the
+user’s question. This is obtained by having two parts: a highlighter,
+which extracts from the sources relevant information to a user’s
+query, and a summarizer, an LLM that polishes and summarizes
+the extracted text. This paper discusses and evaluates the security
+and utility implications of this design pattern. To our surprise, the
+responses given by an H&S pipeline are comparable to, and often
+of better quality than, those coming from a vanilla RAG pipeline.
+
+ACM Reference Format:
+[Author(s)]. 2025. Highlight, then Summarize: RAG without the jailbreaks.
+In [Conference Name]. ACM, New York, NY, USA, 11 pages.
+https://doi.org/10.1145/nnnnnnn.nnnnnnn
+
+Permission to make digital or hard copies of all or part of this work for personal
+or classroom use is granted without fee provided that copies are not made or
+distributed for profit or commercial advantage, and that copies bear this notice
+and the full citation on the first page. Copyrights for components of this work
+owned by others must be honored. Abstracting with credit is permitted. To copy
+otherwise, or republish, to post on servers, or to redistribute to lists, requires
+prior specific permission and/or a fee. Request permissions from permissions@
+acm.org. Conference’17, Washington, DC, USA. © 2025 Copyright held by the
+owner/author(s). Publication rights licensed to ACM.
+
+1 Introduction
+
+Retrieval-augmented Generation (RAG) is a sound and reliable solution for answering questions using documents from a knowledge
+base. From customer support systems to search engines, RAG combines the ability of LLMs to answer questions expressed in natural
+language with the efficiency of vector databases for fetching data
+from large repositories, providing a robust production-ready solution for multiple applications. The core idea in RAG is that, when
+a user asks a question, the system first retrieves a set of relevant
+documents from the knowledge base and passes these to a generative LLM together with the user’s question; the LLM then produces
+an answer, which is returned to the user.
+
+There are many ways an adversary can exploit RAG systems
+if the adversary can provide untrusted inputs. For example, a
+malicious user might jailbreak the system to repurpose its generative abilities or cause it to produce dangerous or offensive content.
+Additionally, one might trick the LLM into generating unintended
+outputs that seem to represent the organization’s stance, which
+could have legal or reputational consequences. A well-known example is when a chatbot spontaneously provides misleading or incorrect
+information that is considered official by a user.
+
+To address these challenges, we introduce Highlight & Summarize
+(H&S), a design that prevents such attacks by ensuring the user’s
+prompt never directly influences the part of the pipeline responsible
+for generating the final output. Specifically, H&S contains:
+(1) A highlighter, which selects text passages relevant to the user’s
+query from retrieved documents. Its output contains only text
+that is already present in the documents.
+(2) A summarizer, which is an LLM that takes only the highlighter’s
+extracted text. It never sees the user’s original question directly;
+therefore, malicious inputs cannot steer the generation process.
+
+We show experimentally that this design pattern prevents common jailbreak attacks, while also delivering strong performance on
+question-answering tasks. In fact, our results indicate that certain
+H&S pipelines can even improve overall accuracy compared to a
+plain RAG approach.
+
+2 Background and Related Work
+
+Jailbreaking defenses. To combat malicious inputs that might reconfigure or misuse an LLM, researchers have tried prompt engineering,
+fine-tuning, content classifiers, or programmatic guardrails in the
+chat flow. Our proposal, H&S, instead eliminates the possibility of
+malicious user prompts reaching the generator directly.
+
+Passage retrieval and extractive Q&A. The first step of H&S, referred
+to as “highlight,” has connections to the fields of passage retrieval
+and extractive Q&A, which extract relevant portions of text from
+longer documents. Many existing solutions use BERT derivatives
+for short-span extraction, or approaches that retrieve the best context for a given query. In H&S, we leverage such techniques but
+then add a summarizer for improved clarity and completeness.
+
+3 Threat Model
+
+We assume the knowledge base is trusted and curated, but user queries
+can be adversarial. Attackers can submit arbitrary prompts and see
+the system’s response. Their goals may include (a) repurposing the
+LLM to do tasks unrelated to the system’s intended purpose, or
+(b) forcing the LLM to produce damaging content. The H&S design
+minimizes these risks by keeping the generative LLM off-limits to
+user-supplied text. We do not consider data extraction or knowledge
+base poisoning in this paper.
+
+4 The H&S Design Pattern
+
+Highlight & Summarize can be added to a RAG system as follows:
+
+Highlight. From the retrieved documents, an automated process (e.g.,
+a fine-tuned BERT or another LLM restricted to quoting existing
+text) extracts passages related to the user’s query.
+
+Summarize. A separate LLM then summarizes or reformulates the extracted text into the final answer. Crucially, it never sees the user’s
+question; it only sees the text from the highlighter.
+
+This approach protects against input-based jailbreaks because no
+user text directly touches the LLM generator. We further show in
+our experiments that H&S often yields as good or better results
+than a standard RAG pipeline.
+
+5 Experimental Setup
+
+We primarily evaluate on the RepliQA dataset—a constructed set of
+questions for which LLMs cannot rely on memorized knowledge.
+We also perform tests on a biomedical question set (BioASQ). We
+measure performance using several automated and LLM-based
+evaluation metrics, comparing correctness, relevance, quality, and
+ability to refuse answers that are not present in the source document.
+
+6 H&S Components
+
+We explore multiple ways to implement the highlighter:
+• H&S Baseline. A simple zero-shot LLM that directly outputs
+extracted quotes from the text, forced to match the original
+document via fuzzy string checks.
+• H&S Structured. A variation that outputs both an “answer” and
+the extracted text as a list, although only the extracted text is
+passed to the summarizer. Structured output tends to help the
+LLM produce more robust answers.
+• H&S DeBERTaV3. An extractive Q&A model fine-tuned to produce
+the relevant snippet as a passage rather than just short-span
+answers.
+
+The summarizer is a prompt-tuned LLM (e.g., GPT-4 variant) that
+combines the extracted text into a coherent final response, also
+guessing what question the extracted text might have answered.
+
+7 Comparison with Vanilla RAG
+
+Our experiments compare H&S (various highlighter implementations) to a traditional RAG pipeline. Surprisingly, H&S often matches
+or exceeds the quality of standard RAG answers, according to both
+automated and LLM-based judgments. H&S also shows improved
+robustness in refusing — or providing no answer — if the document
+cannot answer the question.
+
+Regarding performance overhead, H&S does require two LLM
+calls (one for the highlighter, one for the summarizer), but the extra
+step of summarization can yield clearer outputs than single-pass
+generative RAG. Implementations can further optimize aspects like
+faster extractive Q&A or partial caching.
+
+8 Security Assessment
+
+We test common jailbreaking prompts used previously to coerce
+LLMs into undesired outputs. In typical RAG pipelines, these attacks
+may sometimes succeed if the LLM is forced to consider the instructions verbatim. In H&S, by design, the summarizer sees only
+extracted text from trusted documents; no direct user instructions
+pass through. Our experiments confirm that known jailbreaking
+attacks fail when applied to H&S.
+
+One possible corner case is a “gadgets-based” attack, where a
+document in the knowledge base might accidentally contain all the
+tokens needed to form a malicious sentence if carefully spliced. This
+risk is mitigated if the system requires contiguous passages rather
+than reassembling arbitrary fragments.
+
+9 Discussion and Future Work
+
+Potential future improvements include:
+• Tracking the summarizer’s guessed question for deeper coherence
+checks or as a fallback to handle yes/no queries.
+• Extending to multi-question prompts or partial highlighting.
+• Studying H&S designs specialized for low-hallucination outputs.
+Overall, H&S significantly raises the bar for adversarial input, while
+maintaining or even improving answer quality.
+
+10 Conclusion
+
+We introduced Highlight & Summarize, a design pattern for RAG
+systems that blocks user-supplied text from influencing the generative component of an LLM-based pipeline. Our evaluations show
+that H&S resists common jailbreak attacks and, unexpectedly,
+often provides answers more accurate and polished than a standard
+RAG pipeline. We hope these insights encourage broader exploration of secure-by-design patterns in LLM deployments.
+
+────────────────────────────────────────────────────────────────────────
+HIGHLIGHT
+────────────────────────────────────────────────────────────────────────
+
+Below are key excerpts that capture the central ideas:
+
+    “H&S prevents these attacks by design... the summarizer never sees the user’s question.”
+
+    “The idea is to accomplish the same goal as a RAG pipeline (providing answers based on documents) without letting the LLM be directly exposed to a user’s question.”
+
+    “A malicious user could attempt to jailbreak the system for various purposes, but H&S mitigates that risk by restricting user prompts from interacting directly with the generative LLM.”
+
+    “Our experiments show that, somewhat unexpectedly, H&S pipelines often match or exceed the accuracy of standard RAG pipelines.”
+
+    “We observe that we can still answer user queries effectively by splitting the pipeline into highlight and summarize steps, ensuring that any malicious instructions in the user prompt do not affect the final generation.”
+
+────────────────────────────────────────────────────────────────────────
+SUMMARY
+────────────────────────────────────────────────────────────────────────
+
+“Highlight & Summarize” (H&S) is a secure design pattern for Retrieval-Augmented Generation (RAG) that blocks malicious user inputs from hijacking a large language model. Traditional RAG passes a user’s question plus retrieved documents to a generative LLM, potentially letting adversarial prompts induce bad outputs. H&S instead splits the process into two steps: a highlighter that extracts relevant text from trusted documents, and a summarizer that never sees the user’s original phrasing. Because the summarizer only receives extracted text, user-supplied jailbreak instructions cannot steer the model. Experiments show that, besides preventing jailbreak attacks, H&S’s extracted text plus summarization approach also yields responses as good as or better than a typical RAG system in accuracy and helpfulness.
