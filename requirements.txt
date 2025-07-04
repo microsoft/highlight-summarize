@@ -1,6 +1,5 @@
 datasets
 tqdm
-requests
 openai
 numpy
 scikit-learn
@@ -15,11 +14,7 @@ rapidfuzz
 seaborn
 matplotlib
 azure-identity
-openpyxl
 tiktoken
-sentencepiece
 text_chunker
 nltk
-fschat==0.2.36
 plotly
-streamlit

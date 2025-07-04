@@ -1,5 +1,4 @@
 import os
-import gc
 import sys
 import logging
 from openai import AzureOpenAI, NOT_GIVEN
