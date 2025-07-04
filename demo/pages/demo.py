@@ -1,7 +1,6 @@
 import sys
 import streamlit as st
 
-from about import load_content
 sys.path.append("..")
 from src.hs import HSStructuredHighlighter
 
@@ -9,8 +8,10 @@ from src.hs import HSStructuredHighlighter
 hs = HSStructuredHighlighter(
     highlighter_model_name="gpt-4.1-mini",
     summarizer_model_name="gpt-4.1-mini",
+    min_highlighted_words=15,
 )
 
+from about import load_content
 doc = load_content("highlight_summarize.txt").strip()
 if not doc.strip:
     raise ValueError("The document is empty. Please provide a valid document.")
