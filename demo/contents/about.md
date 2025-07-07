@@ -1,4 +1,4 @@
-# Highlight, then Summarize (H&S)
+# Highlight, then Summarize
 ## RAG Without the Jailbreaks
 
 > **A new design pattern for secure, high-quality LLM-based question answering.**
