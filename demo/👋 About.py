@@ -1,16 +1,8 @@
 import base64
 import streamlit as st
 
-from utils import load_content
+from utils import sidebar, load_content
 
-
-pdf = load_content("highlight_summarize.pdf", mode="rb")
-
-st.sidebar.download_button(label="Get the paper",
-                        data=pdf,
-                        file_name="highlight_summarize.pdf",
-                        mime='application/octet-stream'
-)
 
 
 def img_to_bytes(img_path):
@@ -24,5 +16,11 @@ def img_to_html(img_path):
     )
     return img_html
 
+st.set_page_config(
+    page_title="Highlight & Summarize",
+    page_icon="💬",
+)
+
+sidebar()
 md = load_content("about.md")
 st.markdown(md.replace("{hs_image}", img_to_html("hs.png")), unsafe_allow_html=True)

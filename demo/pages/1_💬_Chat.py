@@ -1,7 +1,7 @@
 import sys
 import streamlit as st
 
-from utils import load_content
+from utils import sidebar, load_content
 sys.path.append("..")
 from src.hs import HSStructuredHighlighter
 
@@ -26,6 +26,7 @@ detective = load_content("detective.png", mode="rb")
 #################################
 st.title("💬 Highlight&Summarize")
 st.caption("🚀 A demo of H&S, which can answer questions about H&S!")
+sidebar()
 
 
 if "messages" not in st.session_state:
