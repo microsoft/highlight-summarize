@@ -1,7 +1,7 @@
 import sys
 import streamlit as st
 
-from utils import sidebar, load_content
+from utils import sidebar, load_content, log
 sys.path.append("..")
 from src.hs import HSStructuredHighlighter
 
@@ -43,6 +43,7 @@ if prompt := st.chat_input():
         question_str=prompt
     )
 
+    # Display.
     md = "Psst! Here's what is happening inside H&S:\n\n"
     lines = [
         f"**Highlighter Output:** {response.highlighter_extracted}.",
@@ -61,3 +62,10 @@ if prompt := st.chat_input():
     else:
         st.chat_message("assistant").write(response.answer_pred)
         st.session_state.messages.append({"role": "assistant", "content": response.answer_pred})
+
+    # Logging.
+    log({
+        "question": prompt,
+        "answer": response.answer_pred,
+        "response": response.model_dump(),
+    })

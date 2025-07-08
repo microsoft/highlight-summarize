@@ -1,7 +1,18 @@
 import os
+import json
 import streamlit as st
 
 CONTENTS_DIR = "demo/contents"
+LOG_FILE = os.getenv("LOG_FILE", "./chats_history.jsonl")
+
+# Logging.
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+def log(data: dict):
+    """Log the interaction to a JSONL file."""
+    with open(LOG_FILE, "a", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False)
+        f.write('\n')
 
 def load_content(fname, mode="r"):
     """Load content from a file in the contents directory."""
