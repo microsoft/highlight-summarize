@@ -14,6 +14,11 @@ def log(data: dict):
         json.dump(data, f, ensure_ascii=False)
         f.write('\n')
 
+def load_content(fname, mode="r"):
+    """Load content from a file in the contents directory."""
+    with open(os.path.join(CONTENTS_DIR, fname), mode) as f:
+        return f.read()
+
 def sidebar():
     with st.sidebar:
         st.title("Highlight & Summarize")
