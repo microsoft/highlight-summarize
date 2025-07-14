@@ -14,7 +14,7 @@
 
 This simple shift dramatically improves **security**, **robustness**, and often even **answer quality**.
 
-📢 **Head over to [/chat](/chat) to play with a H&S Chatbot, which can answers your questions about H&S!**
+📢 **Head over to the [chat](/Chat) to play with a H&S Chatbot, which can answers your questions about H&S!**
 
 ---
 
