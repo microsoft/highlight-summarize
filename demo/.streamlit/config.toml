@@ -1,2 +1,9 @@
 [server]
 enableStaticServing = true
+
+[client]
+showErrorDetails = "none"
+toolbarMode = "minimal"
+
+[ui]
+hideTopBar = true
