@@ -2,7 +2,7 @@ import os
 import json
 import streamlit as st
 
-CONTENTS_DIR = "demo/contents"
+CONTENTS_DIR = "contents"
 LOG_FILE = os.getenv("LOG_FILE", "./chats_history.jsonl")
 
 # Logging.
