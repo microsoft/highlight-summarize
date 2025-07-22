@@ -4,11 +4,11 @@ import time
 import datasets
 from typing import Any
 
-from src.qa import QAEvaluator
-from src.data import load_dataset
-from src.judges import JUDGES_MAP
-from src.threads import mt_map
-from src.hs import HSBaseline, HSStructuredHighlighter, HSBERTExtractor
+from highlight_summarize.qa import QAEvaluator
+from highlight_summarize.data import load_dataset
+from highlight_summarize.judges import JUDGES_MAP
+from highlight_summarize.threads import mt_map
+from highlight_summarize.hs import HSBaseline, HSStructuredHighlighter, HSBERTExtractor
 
 
 PIPELINE_MAP = {

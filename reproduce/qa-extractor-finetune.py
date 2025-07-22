@@ -18,7 +18,7 @@ from transformers import (
     DefaultDataCollator,
 )
 
-from src.data import load_repliqa
+from highlight_summarize.data import load_repliqa
 
 
 def run(model_name):

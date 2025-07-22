@@ -23,7 +23,7 @@ import pandas as pd
 from tqdm import tqdm
 from docopt import docopt
 
-from src.comparison_judge import ComparisonJudge, ResponseChoice, JudgeResponse
+from highlight_summarize.comparison_judge import ComparisonJudge, ResponseChoice, JudgeResponse
 
 def get_run_info(run_folder):
     """Extracts the base folder, dataset name and pipeline from the run folder."""
