@@ -18,6 +18,7 @@ dependencies = [
     "docopt==0.6.2",
     "python-dotenv==1.0.0",  # Fixed package name
     "evaluate==0.4.3",
+    "fschat==0.2.36",
     "judges==0.1.1",
     "matplotlib==3.10.3",
     "nltk==3.9.1",
@@ -42,6 +43,14 @@ dev = [
 demo = [
     "streamlit>=1.20.0",
 ]
+reproduce = [
+    "accelerate==1.9.0",
+    "fschat==0.2.36",
+]
+all = [
+    "highlight-then-summarize[dev,demo,reproduce]",
+]
+
 
 [tool.setuptools.packages.find]
 where = ["."]

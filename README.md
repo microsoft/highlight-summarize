@@ -9,7 +9,7 @@ git clone https://github.com/microsoft/highlight-summarize
 # Ideally, you want to set up a virtualenv at this point:
 python3 -m venv .venv
 source .venv/bin/activate
-pip install .
+pip install .[all]
 ```
 
 
