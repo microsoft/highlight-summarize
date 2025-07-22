@@ -3,8 +3,7 @@ import streamlit as st
 from pydantic import BaseModel
 
 from utils import sidebar, load_content, log
-sys.path.append("..")
-from src.hs import HSStructuredHighlighter, HSBaselinePrediction
+from highlight_summarize.hs import HSStructuredHighlighter, HSBaselinePrediction
 
 #################################
 # H&S and data.
