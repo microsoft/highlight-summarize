@@ -15,16 +15,20 @@ pip install .
 
 ## H&S Demo app
 
+<img width="741" height="599" alt="image" src="https://github.com/user-attachments/assets/4334aac5-8e3c-44da-a02a-e704423a06d0" />
+
+
 The demo app implements a chatbot that answers questions about H&S (based on our paper)
 by implementing the H&S pattern.
 
-It has additional requirements, which can be installed via:
+It has additional requirements. To run it:
 
 ```
 pip install .[demo]
+cd demo
+bash run.sh
 ```
-
-To run it, after installing the `pip` dependencies, run `bash run.sh`.
+**NOTE** The demo by default listen on `0.0.0.0`. You may want to change this to `localhost` by editing `demo/run.sh`.
 
 --------------------
 
