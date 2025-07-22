@@ -1,4 +1,2 @@
-repliqa_3/repliqa_3_results_processed.csv filter=lfs diff=lfs merge=lfs -text
-bioasq/bioasq_results_processed.csv filter=lfs diff=lfs merge=lfs -text
 reproduce/results/bioasq/bioasq_results_processed.csv filter=lfs diff=lfs merge=lfs -text
 reproduce/results/repliqa_3/repliqa_3_results_processed.csv filter=lfs diff=lfs merge=lfs -text
