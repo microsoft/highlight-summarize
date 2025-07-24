@@ -34,6 +34,7 @@ class HighlighterOutput(BaseModel):
     highlighter_extracted: str | None = None
     highlighter_llm_response: str | None = None
     highlighter_text_extracts: list[str] | None = None
+    highlighter_text_extracts_scores: list[float] | None = None
     highlighter_fuzzmatch_scores: list[float] | None = None
     highlighter_score: float | None = None
 
@@ -244,7 +245,6 @@ class HSStructuredHighlighter(HSBaseline):
             model_name=self.highlighter_model_name,
             response_format=LLMOutput,
         )
-        print(f"Extracts and scores: {model_response.text_extracts_scores}")
 
         if not model_response:
             return HighlighterOutput(highlighter_llm_response=None)
@@ -270,6 +270,7 @@ class HSStructuredHighlighter(HSBaseline):
             highlighter_extracted=valid_text.strip(),
             highlighter_llm_response=model_response.answer,
             highlighter_text_extracts=model_response.text_extracts,
+            highlighter_text_extracts_scores=model_response.text_extracts_scores,
             highlighter_fuzzmatch_scores=scores,
         )
 
