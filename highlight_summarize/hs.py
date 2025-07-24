@@ -213,7 +213,7 @@ class HSStructuredHighlighter(HSBaseline):
             "If there is no information in the context that answers the question, "
             f"your answer _must_ be exactly '{NOANSWER_PRED}'.\n"
             "If the question can be answered, you must return the `answer` together with "
-            "a list of text extracts (`text_extracts`) that allowed you to answer the question."
+            "a list of text extracts (`text_extracts`) that allowed you to answer the question, and their scores."
             "Here's the context and question for you to reason about and answer:\n"
             "Context:\n"
             "{context}\n"
@@ -228,6 +228,7 @@ class HSStructuredHighlighter(HSBaseline):
         class LLMOutput(BaseModel):
             answer: str
             text_extracts: list[str]
+            text_extracts_scores: list[float]
 
         model_response = query_llm(
             messages=[
@@ -243,6 +244,7 @@ class HSStructuredHighlighter(HSBaseline):
             model_name=self.highlighter_model_name,
             response_format=LLMOutput,
         )
+        print(f"Extracts and scores: {model_response.text_extracts_scores}")
 
         if not model_response:
             return HighlighterOutput(highlighter_llm_response=None)
