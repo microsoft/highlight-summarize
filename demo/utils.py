@@ -16,7 +16,15 @@ def log(data: dict):
 
 def load_content(fname, mode="r"):
     """Load content from a file in the contents directory."""
-    with open(os.path.join(CONTENTS_DIR, fname), mode) as f:
+
+    if mode == 'r':
+        errors = 'ignore'
+        encoding = 'utf-8'
+    else:
+        errors = None
+        encoding = None
+
+    with open(os.path.join(CONTENTS_DIR, fname), mode, errors=errors, encoding=encoding) as f:
         return f.read()
 
 def sidebar():
