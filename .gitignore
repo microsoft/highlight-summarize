@@ -37,3 +37,4 @@ ENV/
 models/
 *.log
 .DS_Store
+demo/chats_history.jsonl
