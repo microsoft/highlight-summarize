@@ -7,3 +7,7 @@ toolbarMode = "minimal"
 
 [ui]
 hideTopBar = true
+
+[logger]
+# Level of logging: "error", "warning", "info", or "debug"
+level = "error"
