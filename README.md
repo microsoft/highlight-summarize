@@ -1,14 +1,25 @@
-# Highlight then Summarize
+# Highlight & Summarize
 
-This repository collects the code that enables reproducing out experiments for the H&S paper.
+This repository contains code for running the H&S demo and reproducing the experiments described in the H&S paper.
 
-To get started:
+
+
+## Getting Started
 
 ```
+# Clone the git repository
 git clone https://github.com/microsoft/highlight-summarize
-# Ideally, you want to set up a virtualenv at this point:
+
+# Create a Python virtual environment
 python3 -m venv .venv
+
+# Activate the virtual environment (Linux)
 source .venv/bin/activate
+
+# Activate the virtual environment (Windows)
+.venv\Scripts\Activate.ps1 # On Windows
+
+# Install this project and its dependencies 
 pip install .[all]
 ```
 
@@ -28,7 +39,7 @@ pip install .[demo]
 cd demo
 bash run.sh
 ```
-**NOTE** The demo by default listen on `0.0.0.0`. You may want to change this to `localhost` by editing `demo/run.sh`.
+**Note** By default, the demo app listens on `0.0.0.0`. You may want to change this to `localhost` by editing `demo/run.sh`.
 
 --------------------
 
