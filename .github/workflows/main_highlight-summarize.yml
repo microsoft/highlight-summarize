@@ -7,7 +7,7 @@ name: Build and deploy Python app to Azure Web App - highlight-summarize
 on:
   push:
     branches:
-      - staging-before-public
+      - main
   workflow_dispatch:
 
 jobs:
