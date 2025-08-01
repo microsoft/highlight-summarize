@@ -3,8 +3,12 @@ import streamlit as st
 from pydantic import BaseModel
 
 from utils import sidebar, load_content, log
+<<<<<<< HEAD
+from highlight_summarize.hs import HSStructuredHighlighter, HSBaselinePrediction
+=======
 sys.path.append("..")
 from src.hs import HSStructuredHighlighter, HSBaselinePrediction
+>>>>>>> cf444e549c1995aac546dc7a5040358c86aac1d3
 
 #################################
 # H&S and data.
@@ -47,8 +51,12 @@ class Msg(BaseModel):
         if not self.full_response:
             raise ValueError("No full response to display.")
         md = "Psst! Here's what is happening inside H&S:\n\n"
+        texts_and_scores = "\n".join([
+            f"{text} (Score: {score})"
+            for text, score in zip(self.full_response.highlighter_text_extracts, self.full_response.highlighter_text_extracts_scores)
+        ])
         lines = [
-            f"**Highlighter Output:** {self.full_response.highlighter_extracted}.",
+            f"**Highlighter Output:** {texts_and_scores}.",
             f"**What question the summarizer thinks was asked:** {self.full_response.summarizer_llm_guessed_question}.",
             f"**Summarizer response:** {self.full_response.answer_pred}."
         ]

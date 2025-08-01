@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "highlight-then-summarize"
+version = "0.1.0"
+description = "A RAG design pattern for secure, high-quality LLM-based question answering."
+readme = "README.md"
+requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "Giovanni Cherubin", email = "giovanni.cherubin@microsoft.com"},
+]
+dependencies = [
+    "azure-identity==1.23.0",
+    "datasets==3.6.0",
+    "docopt==0.6.2",
+    "python-dotenv==1.0.0",  # Fixed package name
+    "evaluate==0.4.3",
+    "fschat==0.2.36",
+    "judges==0.1.1",
+    "matplotlib==3.10.3",
+    "nltk==3.9.1",
+    "numpy==2.2.6",
+    "openai==1.86.0",
+    "plotly==6.2.0",
+    "rapidfuzz==3.13.0",
+    "scikit-learn==1.6.1",
+    "seaborn>=0.13.2",
+    "text_chunker==0.2.2",
+    "tiktoken==0.9.0",
+    "torch>=2.7.1",
+    "tqdm>=4.67.1",
+    "transformers==4.51.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=22.0",
+    "ipykernel>=6.0",
+]
+demo = [
+    "streamlit>=1.20.0",
+]
+reproduce = [
+    "accelerate==1.9.0",
+    "fschat==0.2.36",
+]
+all = [
+    "highlight-then-summarize[dev,demo,reproduce]",
+]
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["highlight_summarize*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.txt", "*.md"]

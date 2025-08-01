@@ -1,32 +1,45 @@
-# Highlight then Summarize
+# Highlight & Summarize
 
-This repository collects the code that enables reproducing out experiments for the H&S paper.
+This repository contains code for running the H&S demo and reproducing the experiments described in the H&S paper.
 
-First, `pip install -r requirements.txt`.
 
-## Main experiments (inference + judgement)
 
-The main experiments are configured via `experiments.yaml`, and they are run
-via `python run_experiments.py`.
-**NOTE**: the [judges](https://github.com/quotient-ai/judges) library that we use
-didn't play too well with our multithreading implementation.
-If you see an error such as "too many open files", this may be because `judges`
-is opening several TCP connections, which are amplified by our multithreading setup,
-and this could make the code fail.
-A workaround is to `ulimit -n 10000` before running this code; in our experiments,
-the number of TCP connections never exceeded 2000, so this should work fine.
+## Getting Started
 
-## Pairwise comparisons
+```
+# Clone the git repository
+git clone https://github.com/microsoft/highlight-summarize
 
-After running `run_experiments.py`, we can do pairwise comparisons via an LLM
-as a judge.
-In particular:
-- compare between highlighter vs HS: `python compare.py highlighter <run_folder>`. E.g., `python compare.py highlighter results/repliqa_3/HSBaseline-gpt-4.1-mini-gpt-4.1-mini`.
-- compare the pipelines pairwise: `python compare.py pairwise <dataset results folder>`. E.g., `python compare.py pairwise results/repliqa_3`.
+# Create a Python virtual environment
+python3 -m venv .venv
+
+# Activate the virtual environment (Linux)
+source .venv/bin/activate
+
+# Activate the virtual environment (Windows)
+.venv\Scripts\Activate.ps1 # On Windows
+
+# Install this project and its dependencies 
+pip install .[all]
+```
+
 
 ## H&S Demo app
 
-To run it, after installing the `pip` dependencies, run `bash run.sh`.
+<img width="741" height="599" alt="image" src="https://github.com/user-attachments/assets/4334aac5-8e3c-44da-a02a-e704423a06d0" />
+
+
+The demo app implements a chatbot that answers questions about H&S (based on our paper)
+by implementing the H&S pattern.
+
+It has additional requirements. To run it:
+
+```
+pip install .[demo]
+cd demo
+bash run.sh
+```
+**Note** By default, the demo app listens on `0.0.0.0`. You may want to change this to `localhost` by editing `demo/run.sh`.
 
 --------------------
 
