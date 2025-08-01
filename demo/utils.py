@@ -16,7 +16,6 @@ def log(data: dict):
 
 def load_content(fname, mode="r"):
     """Load content from a file in the contents directory."""
-
     if mode == 'r':
         errors = 'ignore'
         encoding = 'utf-8'
