@@ -41,7 +41,6 @@ jobs:
         run: |
           cd demo
           zip -r ../release.zip .
-          cd ..
 
       - name: Upload artifact for deployment jobs
         uses: actions/upload-artifact@v4
