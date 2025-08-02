@@ -26,17 +26,14 @@ jobs:
 
       - name: Create and start virtual environment
         run: |
-          python -m venv venv
-          source venv/bin/activate
+          python -m venv .venv
+          source .venv/bin/activate
       
-      #- name: Point to the right dependencies file
-      #  run: cp demo/requirements.txt requirements.txt
-
       - name: "pip install"
-        run: pip install .[demo]
+        run: |
+          pip install .[demo]
+          mv .venv demo
         
-      # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
-
       - name: Zip artifact for deployment
         run: |
           cd demo
