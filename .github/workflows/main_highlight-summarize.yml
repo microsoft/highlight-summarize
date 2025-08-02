@@ -18,24 +18,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python version
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Create and start virtual environment
-        run: |
-          python -m venv .venv
-          source .venv/bin/activate
-      
-      - name: "pip install"
-        run: |
-          pip install .[demo]
-          mv .venv demo
         
       - name: Zip artifact for deployment
         run: |
+          cp pyproject.toml demo
           cd demo
           zip -r ../release.zip .
 
@@ -43,9 +29,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: python-app
-          path: |
-            release.zip
-            !venv/
+          path: release.zip
 
   deploy:
     runs-on: ubuntu-latest

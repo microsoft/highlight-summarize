@@ -2,6 +2,19 @@
 
 This folder contains the code to enable reproducing the experiments contained in our paper.
 
+## Plots and results analysis
+
+We share the full responses of H&S and RAG pipelines, as well as the ratings provided by
+LLM as judges. These results can be dowloaded via:
+
+```
+git lfs pull --exclude=""
+```
+
+and then analyzed via the `data-analysis.ipynb` notebook. This notebook also enables
+recreating all our experiments' figures and tables.
+
+If you want to re-run the experiments from scratch, follow the guide below.
 
 ## Main experiments (inference + judgement)
 
