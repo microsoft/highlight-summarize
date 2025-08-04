@@ -11,36 +11,23 @@ class LLMJudgeResponse(BaseModel):
     explanation: str
 
 
-class LLMJudgeStructured:
+class LLMJudge:
+    """A base class for LLM as judges."""
     def __init__(
-        self, model_name="gpt-4.1-mini", temperature=0, scale_min=1, scale_max=10,
-        factors=["correctness", "faithfulness", "naturalness"]
+        self, judge_name, correct=10, incorrect=1, factors=[],
     ):
-        self.judge_name = f"LLMJudgeStructured-{model_name}"
-        self.model_name = model_name
-        self.temperature = temperature
-        self.scale_min = scale_min
-        self.scale_max = scale_max
-        self.user_prompt = dedent(
-            """
-            [System]
-            Please act as an impartial judge and evaluate the quality of the response provided by an
-            AI assistant to the user question displayed below. Your evaluation should consider factors
-            such as the correctness, faithfulness, and the naturalness of
-            the response. Begin your evaluation by providing a short explanation. Be as objective as
-            possible. After providing your explanation, please rate the response on a scale of {scale_min} to {scale_max}.
-            [Question]
-            {input}
-            [Expected]
-            {expected}
-            [The Start of Assistant's Answer]
-            {output}
-            [The End of Assistant's Answer]"""
-        )
+        """Initialize the judge with a name, correctness ratings, and factors.
+
+        Args:
+            judge_name (str): The name of the judge.
+            correct (int | bool): The rating for correct responses.
+            incorrect (int | bool): The rating for incorrect responses.
+            factors (list[str]): The factors to judge on.
+        """
+        self.judge_name = judge_name
+        self.correct = correct
+        self.incorrect = incorrect
         self.factors = factors
-        # This can be overridden by the judge.
-        self.correct = scale_max
-        self.incorrect = scale_min
 
     def _format_response(self, responses: dict[LLMJudgeResponse]) -> dict[str, Any]:
         """Formats the response from the judge into a dictionary."""
@@ -78,57 +65,16 @@ class LLMJudgeStructured:
         return self._format_response(judgement)
 
     def call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
-        """Provides a response for each of the factors specified in the prompt."""
+        """Provides a response for each of the factors specified in the prompt.
+        This must be implemented by subclasses.
+        """
+        raise NotImplementedError()
 
-        # Call judge.
-        # NOTE: keeping a flat structure because I fear the LLM
-        # may otherwise hallucinate.
-        class LLMRatingOutput(BaseModel):
-            correctness_explanation: str
-            correctness: int
-            faithfulness: int
-            faithfulness_explanation: str
-            naturalness: int
-            naturalness_explanation: str
-
-        user_prompt = self.user_prompt.format(
-            input=input,
-            expected=expected,
-            output=output,
-            scale_min=self.scale_min,
-            scale_max=self.scale_max,
-        )
-
-        model_response = query_llm(
-            messages=[
-                {"role": "system", "content": "You are an impartial judge."},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=self.temperature,
-            model_name=self.model_name,
-            response_format=LLMRatingOutput,
-        )
-
-        return {
-            factor: LLMJudgeResponse(
-                rating=(
-                    getattr(model_response, factor)
-                    if hasattr(model_response, factor)
-                    else None
-                ),
-                explanation=(
-                    getattr(model_response, f"{factor}_explanation")
-                    if hasattr(model_response, f"{factor}_explanation")
-                    else model_response
-                ),
-            )
-            for factor in ["correctness", "faithfulness", "naturalness"]
-        }
 
 
 ####################################################################################
-# Support for https://github.com/quotient-ai/judges.
-# NOTE: the following hack is necessary to allow the library to support Azure OpenAI.
+# Monkey-patching support for https://github.com/quotient-ai/judges.
+# NOTE: the following hack is used to support Azure OpenAI.
 def patched_get_completion(
     messages: list[dict[str, str]],
     model: str,
@@ -152,27 +98,19 @@ def patched_get_completion(
         seed=seed,
         response_format=response_format,
     )
-
-
 judges_lib.base.get_completion = patched_get_completion
-# End of the hack.
+# End of monkey patching.
 ####################################################################################
 
 
-class PollMultihopCorrectnessWrapper(LLMJudgeStructured):
-    def __init__(
-        self, model_name="gpt-4.1-mini", temperature=0, scale_min=1, scale_max=10
-    ):
+class PollMultihopCorrectnessWrapper(LLMJudge):
+    def __init__(self, model_name="gpt-4.1-mini"):
         super().__init__(
-            model_name=model_name,
-            temperature=temperature,
-            scale_min=scale_min,
-            scale_max=scale_max,
+            judge_name=f"PollMultihopCorrectness-{model_name}",
+            correct=True,
+            incorrect=False,
             factors=["correctness"],
         )
-        self.judge_name = f"PollMultihopCorrectness-{model_name}"
-        self.correct = True
-        self.incorrect = False
         self.judge = judges_lib.PollMultihopCorrectness(model=model_name)
 
     def call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
@@ -188,20 +126,14 @@ class PollMultihopCorrectnessWrapper(LLMJudgeStructured):
         }
 
 
-class MTBenchChatBotResponseQualityWrapper(LLMJudgeStructured):
-    def __init__(
-        self, model_name="gpt-4.1-mini", temperature=0, scale_min=1, scale_max=10
-    ):
+class MTBenchChatBotResponseQualityWrapper(LLMJudge):
+    def __init__(self, model_name="gpt-4.1-mini"):
         super().__init__(
-            model_name=model_name,
-            temperature=temperature,
-            scale_min=scale_min,
-            scale_max=scale_max,
+            judge_name=f"MTBenchChatBotResponseQuality-{model_name}",
+            correct=10,
+            incorrect=1,
             factors=["quality"],
         )
-        self.judge_name = f"MTBenchChatBotResponseQuality-{model_name}"
-        self.correct = scale_max
-        self.incorrect = scale_min
         self.judge = judges_lib.MTBenchChatBotResponseQuality(model=model_name)
 
     def call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
@@ -218,23 +150,17 @@ class MTBenchChatBotResponseQualityWrapper(LLMJudgeStructured):
 
 
 class ReliableCIRelevanceWrapper(MTBenchChatBotResponseQualityWrapper):
-    def __init__(
-        self, model_name="gpt-4.1-mini", temperature=0, scale_min=0, scale_max=3
-    ):
+    def __init__(self, model_name="gpt-4.1-mini"):
         super().__init__(
-            model_name=model_name,
-            temperature=temperature,
-            scale_min=scale_min,
-            scale_max=scale_max,
+            judge_name=f"ReliableCIRelevance-{model_name}",
+            correct=3,
+            incorrect=0,
+            factors=["relevance"],
         )
-        self.judge_name = f"ReliableCIRelevance-{model_name}"
-        self.correct = scale_max
-        self.incorrect = scale_min
         self.judge = judges_lib.ReliableCIRelevance(model=model_name)
 
 
 JUDGES_MAP = {
-    "LLMJudgeStructured": LLMJudgeStructured,
     "PollMultihopCorrectness": PollMultihopCorrectnessWrapper,
     "MTBenchChatBotResponseQuality": MTBenchChatBotResponseQualityWrapper,
     "ReliableCIRelevance": ReliableCIRelevanceWrapper,
