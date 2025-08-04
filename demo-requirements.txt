@@ -1,9 +1,0 @@
-openai
-numpy
-dotenv
-rapidfuzz
-azure-identity
-tiktoken
-text_chunker
-nltk
-streamlit
