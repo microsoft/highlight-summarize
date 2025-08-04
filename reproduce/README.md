@@ -11,6 +11,8 @@ LLM as judges. These results can be dowloaded via:
 git lfs pull --exclude=""
 ```
 
+(The above assumes you have installed `git-lfs`. E.g., `sudo apt install git-lfs`)
+
 They can then be found under the `results/` folder.
 
 We also provide a notebook, `data-analysis.ipynb`, which enables
@@ -39,3 +41,8 @@ as a judge.
 In particular:
 - compare between highlighter vs HS: `python compare.py highlighter <run_folder>`. E.g., `python compare.py highlighter results/repliqa_3/HSBaseline-gpt-4.1-mini-gpt-4.1-mini`.
 - compare the pipelines pairwise: `python compare.py pairwise <dataset results folder>`. E.g., `python compare.py pairwise results/repliqa_3`.
+
+### DeBERTaV3 fine-tuning
+
+In our experiments, we also used a DeBERTaV3 model as highlighter, fine-tuned on the RepliQA dataset.
+To repeat this fine-tuning, run `python qa-extractor-finetune.py`.

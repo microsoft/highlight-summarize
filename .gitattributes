@@ -1,2 +1,10 @@
 reproduce/results/bioasq/bioasq_results_processed.csv filter=lfs diff=lfs merge=lfs -text
 reproduce/results/repliqa_3/repliqa_3_results_processed.csv filter=lfs diff=lfs merge=lfs -text
+reproduce/results/repliqa_3/comparison-HSStructuredHighlighter-gpt-4.1-mini-gpt-4.1-mini-highlighter_vs_hs.jsonl filter=lfs diff=lfs merge=lfs -text
+reproduce/results/repliqa_3/comparison-HSStructuredHighlighter-gpt-4.1-mini-gpt-4.1-mini_vs_HSBERTExtractor-deepset_deberta-v3-base-squad2-gpt-4.1-mini.jsonl filter=lfs diff=lfs merge=lfs -text
+reproduce/results/repliqa_3/comparison-HSStructuredHighlighter-gpt-4.1-mini-gpt-4.1-mini_vs_HSBERTExtractor-models_microsoft-deberta-v3-base-repliqa-gpt-4.1-mini.jsonl filter=lfs diff=lfs merge=lfs -text
+reproduce/results/bioasq/comparison-HSStructuredHighlighter-gpt-4.1-mini-gpt-4.1-mini-highlighter_vs_hs.jsonl filter=lfs diff=lfs merge=lfs -text
+reproduce/results/bioasq/comparison-HSStructuredHighlighter-gpt-4.1-mini-gpt-4.1-mini_vs_HSBERTExtractor-deepset_deberta-v3-base-squad2-gpt-4.1-mini.jsonl filter=lfs diff=lfs merge=lfs -text
+reproduce/results/bioasq/comparison-HSStructuredHighlighter-gpt-4.1-mini-gpt-4.1-mini_vs_HSBERTExtractor-models_microsoft-deberta-v3-base-repliqa-gpt-4.1-mini.jsonl filter=lfs diff=lfs merge=lfs -text
+reproduce/results/bioasq/comparison-HSStructuredHighlighter-gpt-4.1-mini-gpt-4.1-mini_vs_HSBaseline-gpt-4.1-mini-gpt-4.1-mini.jsonl filter=lfs diff=lfs merge=lfs -text
+reproduce/results/bioasq/comparison-HSStructuredHighlighter-gpt-4.1-mini-gpt-4.1-mini_vs_QAEvaluator-gpt-4.1-mini.jsonl filter=lfs diff=lfs merge=lfs -text

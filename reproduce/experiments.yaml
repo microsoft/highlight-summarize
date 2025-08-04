@@ -28,7 +28,7 @@ experiments:
         highlighter_model_name: "models/microsoft-deberta-v3-base-repliqa"
         summarizer_model_name: "gpt-4.1-mini"
 
-    hsbert_experiment:
+    hsbert_experiment_squad:
         <<: *base
         pipeline: "HSBERTExtractor"
         highlighter_model_name: "deepset/deberta-v3-base-squad2"
@@ -36,18 +36,17 @@ experiments:
 
 # The datasets to use in the experiments.
 datasets:
-    - repliqa_3
-    - bioasq
-    # - repliqa_3-subsampled
-    # - bioasq-subsampled
+  - repliqa_3
+  - bioasq
+  - repliqa_3-subsampled
+  - bioasq-subsampled
 
 judges_config:
     model_name: "gpt-4.1-mini"
     temperature: 0
     judges:
-    - LLMJudgeStructured
-    - PollMultihopCorrectness
-    - MTBenchChatBotResponseQuality
-    - ReliableCIRelevance
+      - PollMultihopCorrectness
+      - ReliableCIRelevance
+      - MTBenchChatBotResponseQuality
 
-max_threads: 50
+max_threads: 30 
