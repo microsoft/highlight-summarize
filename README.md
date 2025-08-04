@@ -1,6 +1,6 @@
 # Highlight & Summarize
 
-This repository contains code for running the H&S demo and reproducing the experiments described in the H&S paper.
+This repository contains code for reproducing the experiments described in the H&S paper and running the H&S demo.
 
 
 
@@ -23,6 +23,7 @@ source .venv/bin/activate
 pip install .[all]
 ```
 
+To reproduce the experiments, head over to [reproduce](reproduce/).
 
 ## H&S Demo app
 

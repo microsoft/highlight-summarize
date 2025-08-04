@@ -34,7 +34,6 @@ class HighlighterOutput(BaseModel):
     highlighter_extracted: str | None = None
     highlighter_llm_response: str | None = None
     highlighter_text_extracts: list[str] | None = None
-    highlighter_text_extracts_scores: list[float] | None = None
     highlighter_fuzzmatch_scores: list[float] | None = None
     highlighter_score: float | None = None
 
@@ -214,7 +213,7 @@ class HSStructuredHighlighter(HSBaseline):
             "If there is no information in the context that answers the question, "
             f"your answer _must_ be exactly '{NOANSWER_PRED}'.\n"
             "If the question can be answered, you must return the `answer` together with "
-            "a list of text extracts (`text_extracts`) that allowed you to answer the question, and their scores."
+            "a list of text extracts (`text_extracts`) that allowed you to answer the question."
             "Here's the context and question for you to reason about and answer:\n"
             "Context:\n"
             "{context}\n"
@@ -229,7 +228,6 @@ class HSStructuredHighlighter(HSBaseline):
         class LLMOutput(BaseModel):
             answer: str
             text_extracts: list[str]
-            text_extracts_scores: list[float]
 
         model_response = query_llm(
             messages=[
@@ -270,7 +268,6 @@ class HSStructuredHighlighter(HSBaseline):
             highlighter_extracted=valid_text.strip(),
             highlighter_llm_response=model_response.answer,
             highlighter_text_extracts=model_response.text_extracts,
-            highlighter_text_extracts_scores=model_response.text_extracts_scores,
             highlighter_fuzzmatch_scores=scores,
         )
 

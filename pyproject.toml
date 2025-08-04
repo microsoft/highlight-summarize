@@ -45,6 +45,7 @@ demo = [
 ]
 reproduce = [
     "accelerate==1.9.0",
+    "bert_score==0.3.13",
     "fschat==0.2.36",
 ]
 all = [
