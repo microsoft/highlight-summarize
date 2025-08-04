@@ -11,6 +11,8 @@ LLM as judges. These results can be dowloaded via:
 git lfs pull --exclude=""
 ```
 
+(The above assumes you have installed `git-lfs`. E.g., `sudo apt install git-lfs`)
+
 They can then be found under the `results/` folder.
 
 We also provide a notebook, `data-analysis.ipynb`, which enables
