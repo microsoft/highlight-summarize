@@ -1,61 +1,52 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
-[project]
+[tool.poetry]
 name = "highlight-then-summarize"
 version = "0.1.0"
 description = "A RAG design pattern for secure, high-quality LLM-based question answering."
 readme = "README.md"
-requires-python = ">=3.12"
-license = {text = "MIT"}
-authors = [
-    {name = "Giovanni Cherubin", email = "giovanni.cherubin@microsoft.com"},
-]
-dependencies = [
-    "azure-identity==1.23.0",
-    "datasets==3.6.0",
-    "docopt==0.6.2",
-    "python-dotenv==1.0.0",  # Fixed package name
-    "evaluate==0.4.3",
-    "fschat==0.2.36",
-    "judges==0.1.1",
-    "matplotlib==3.10.3",
-    "nltk==3.9.1",
-    "numpy==2.2.6",
-    "openai==1.86.0",
-    "plotly==6.2.0",
-    "rapidfuzz==3.13.0",
-    "scikit-learn==1.6.1",
-    "seaborn>=0.13.2",
-    "text_chunker==0.2.2",
-    "tiktoken==0.9.0",
-    "torch>=2.7.1",
-    "tqdm>=4.67.1",
-    "transformers==4.52.1",
-]
+license = "MIT"
+authors = ["Giovanni Cherubin <giovanni.cherubin@microsoft.com>"]
+packages = [{include = "highlight_summarize"}]
 
-[project.optional-dependencies]
-dev = [
-    "black>=22.0",
-    "ipykernel>=6.0",
-]
-demo = [
-    "streamlit>=1.20.0",
-]
-reproduce = [
-    "accelerate==1.9.0",
-    "bert_score==0.3.13",
-    "fschat==0.2.36",
-]
-all = [
-    "highlight-then-summarize[dev,demo,reproduce]",
-]
+[tool.poetry.dependencies]
+python = "^3.12"
+azure-identity = "1.23.0"
+datasets = "3.6.0"
+docopt = "0.6.2"
+python-dotenv = "1.0.0"
+evaluate = "0.4.3"
+fschat = "0.2.36"
+judges = "0.1.1"
+matplotlib = "3.10.3"
+nltk = "3.9.1"
+numpy = "2.2.6"
+openai = "1.86.0"
+plotly = "6.2.0"
+rapidfuzz = "3.13.0"
+scikit-learn = "1.6.1"
+seaborn = "^0.13.2"
+text-chunker = "0.2.2"
+tiktoken = "0.9.0"
+torch = "^2.7.1"
+tqdm = "^4.67.1"
+transformers = "4.51.3"
 
+# Optional dependencies for development
+black = { version = "^22.0", optional = true }
+ipykernel = { version = "^6.0", optional = true }
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["highlight_summarize*"]
+# Optional dependencies for demo
+streamlit = { version = "^1.20.0", optional = true }
 
-[tool.setuptools.package-data]
-"*" = ["*.txt", "*.md"]
+# Optional dependencies for reproduce
+accelerate = { version = "1.9.0", optional = true }
+bert-score = { version = "0.3.13", optional = true }
+
+[tool.poetry.extras]
+dev = ["black", "ipykernel"]
+demo = ["streamlit"]
+reproduce = ["accelerate", "bert-score"]
+all = ["black", "ipykernel", "streamlit", "accelerate", "bert-score"]
