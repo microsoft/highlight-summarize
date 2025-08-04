@@ -11,12 +11,16 @@ LLM as judges. These results can be dowloaded via:
 git lfs pull --exclude=""
 ```
 
-and then analyzed via the `data-analysis.ipynb` notebook. This notebook also enables
+They can then be found under the `results/` folder.
+
+We also provide a notebook, `data-analysis.ipynb`, which enables
 recreating all our experiments' figures and tables.
 
-If you want to re-run the experiments from scratch, follow the guide below.
+## Re-run from scratch
 
-## Main experiments (inference + judgement)
+If instead you want to re-run the experiments from scratch, follow these steps.
+
+### Main experiments (inference + judgement)
 
 The main experiments are configured via `experiments.yaml`, and they are run
 via `python run_experiments.py`.
@@ -28,7 +32,7 @@ and this could make the code fail.
 A workaround is to `ulimit -n 10000` before running this code; in our experiments,
 the number of TCP connections never exceeded 2000, so this should work fine.
 
-## Pairwise comparisons
+### Pairwise comparisons
 
 After running `run_experiments.py`, we can do pairwise comparisons via an LLM
 as a judge.
