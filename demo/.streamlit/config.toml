@@ -1,0 +1,13 @@
+[server]
+enableStaticServing = true
+
+[client]
+showErrorDetails = "none"
+toolbarMode = "viewer"
+
+[ui]
+hideTopBar = true
+
+[logger]
+# Level of logging: "error", "warning", "info", or "debug"
+level = "error"
