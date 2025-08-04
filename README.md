@@ -1,4 +1,5 @@
 # Highlight & Summarize
+![Highlight & Summarize](demo/contents/hs.png)
 
 This repository contains code for reproducing the experiments described in the H&S paper and running the H&S demo.
 
