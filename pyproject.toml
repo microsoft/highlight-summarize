@@ -19,7 +19,7 @@ dependencies = [
     "python-dotenv==1.0.0",  # Fixed package name
     "evaluate==0.4.3",
     "fschat==0.2.36",
-    "judges==0.1.1",
+    "judges==0.0.12",
     "matplotlib==3.10.3",
     "nltk==3.9.1",
     "numpy==2.2.6",
