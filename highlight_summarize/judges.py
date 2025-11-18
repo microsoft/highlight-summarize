@@ -151,7 +151,8 @@ class MTBenchChatBotResponseQualityWrapper(LLMJudge):
 
 class ReliableCIRelevanceWrapper(MTBenchChatBotResponseQualityWrapper):
     def __init__(self, model_name="gpt-4.1-mini"):
-        super().__init__(
+        LLMJudge.__init__(
+            self,
             judge_name=f"ReliableCIRelevance-{model_name}",
             correct=3,
             incorrect=0,
