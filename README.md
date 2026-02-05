@@ -24,6 +24,11 @@ source .venv/bin/activate
 pip install .[all]
 ```
 
+## Azure OpenAI authentication
+
+This is done via Microsoft Entra ID. Ensure your machine is authenticated, and then `export AZURE_OPENAI_ENDPOINT={your endpoint}`.
+To add support for an additional client, edit `openai_client()` at `highlight_summarize/utils.py`.
+
 ## H&S Demo app
 
 <img width="741" height="599" alt="image" src="https://github.com/user-attachments/assets/4334aac5-8e3c-44da-a02a-e704423a06d0" />
