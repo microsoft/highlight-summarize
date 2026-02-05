@@ -8,14 +8,22 @@ from highlight_summarize.qa import QAEvaluator
 from highlight_summarize.data import load_dataset
 from highlight_summarize.judges import JUDGES_MAP
 from highlight_summarize.threads import mt_map
-from highlight_summarize.hs import HSBaseline, HSStructuredHighlighter, HSBERTExtractor
+from highlight_summarize.hs import (
+    HSBaseline,
+    HSStructuredHighlighter,
+    HSBERTExtractor,
+    HSSpanHighlighter,
+    HSTwoStepsHighlighter,
+)
 
 
 PIPELINE_MAP = {
     "QAEvaluator": QAEvaluator,
     "HSBaseline": HSBaseline,
     "HSStructuredHighlighter": HSStructuredHighlighter,
+    "HSSpanHighlighter": HSSpanHighlighter,
     "HSBERTExtractor": HSBERTExtractor,
+    "HSTwoStepsHighlighter": HSTwoStepsHighlighter,
 }
 
 
@@ -149,7 +157,6 @@ def run_judgement(
         print(f"    > Running judgement for {run_id} with judge {judge_name}.")
         judge = judge_cls(
             model_name=judges_config["model_name"],
-            temperature=judges_config["temperature"],
         )
 
         judged_dataset = mt_map(
@@ -164,31 +171,44 @@ def run_judgement(
     return judged_dataset
 
 
-def load_all_results(results_dir="results/") -> dict[str, Any]:
-    """Load all results from the results directory."""
-    judged_results = {}
+def load_all_results(results_dir="results/") -> dict[str, datasets.Dataset]:
+    """Load all results from the results directory and combine them by dataset."""
+    combined_results = {}
+
     for dataset_name in os.listdir(results_dir):
         if not os.path.isdir(os.path.join(results_dir, dataset_name)):
             continue
         print(f"Processing dataset: {dataset_name}")
-        for pipeline_name in os.listdir(os.path.join(results_dir, dataset_name)):
-            if not os.path.isdir(os.path.join(results_dir, dataset_name, pipeline_name)):
+
+        dataset_results = []
+        for run_id in os.listdir(os.path.join(results_dir, dataset_name)):
+            if not os.path.isdir(os.path.join(results_dir, dataset_name, run_id)):
                 continue
-            run_id = os.path.join(dataset_name, pipeline_name)
-            dirname = os.path.join(results_dir, run_id, "judgement")
+
+            dirname = os.path.join(results_dir, dataset_name, run_id, "judgement")
             if not os.path.isdir(dirname):
                 print(f"Skipping {run_id} as {dirname} doesn't exist.")
                 continue
+
             try:
                 res = datasets.load_from_disk(dirname)
+                # Add run_id and pipeline columns to each row
             except Exception as e:
                 print(f"Error loading {run_id} from {dirname}: {e}")
+                continue
+            # FIXME: this assumes that the pipeline name doesn't have dashes.
+            pipeline = run_id.split("-")[0]
+            res = res.add_column("run_id", [run_id] * len(res))
+            res = res.add_column("pipeline", [pipeline] * len(res))
+            dataset_results.append(res)
 
-            if dataset_name not in judged_results:
-                judged_results[dataset_name] = {}
-            judged_results[dataset_name][pipeline_name] = res
+        # Concatenate all results for this dataset
+        if dataset_results:
+            combined_results[dataset_name] = datasets.concatenate_datasets(
+                dataset_results
+            )
 
-    return judged_results
+    return combined_results
 
 
 if __name__ == "__main__":

@@ -24,7 +24,10 @@ source .venv/bin/activate
 pip install .[all]
 ```
 
-To reproduce the experiments, head over to [reproduce](reproduce/).
+## Azure OpenAI authentication
+
+This is done via Microsoft Entra ID. Ensure your machine is authenticated, and then `export AZURE_OPENAI_ENDPOINT={your endpoint}`.
+To add support for an additional client, edit `openai_client()` at `highlight_summarize/utils.py`.
 
 ## H&S Demo app
 
@@ -42,6 +45,14 @@ cd demo
 bash run.sh
 ```
 **Note** By default, the demo app listens on `0.0.0.0`. You may want to change this to `localhost` by editing `demo/run.sh`.
+
+## Reproducing the paper's experiments
+
+To reproduce the experiments, head over to [reproduce](reproduce/).
+
+## Lean 4 proofs
+
+To check out the proofs of our theory section.
 
 --------------------
 

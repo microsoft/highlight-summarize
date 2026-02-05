@@ -1,5 +1,4 @@
 import judges as judges_lib
-from textwrap import dedent
 from typing import Any
 from pydantic import BaseModel
 
@@ -13,8 +12,13 @@ class LLMJudgeResponse(BaseModel):
 
 class LLMJudge:
     """A base class for LLM as judges."""
+
     def __init__(
-        self, judge_name, correct=10, incorrect=1, factors=[],
+        self,
+        judge_name,
+        correct=10,
+        incorrect=1,
+        factors=[],
     ):
         """Initialize the judge with a name, correctness ratings, and factors.
 
@@ -29,7 +33,9 @@ class LLMJudge:
         self.incorrect = incorrect
         self.factors = factors
 
-    def _format_response(self, responses: dict[LLMJudgeResponse]) -> dict[str, Any]:
+    def _format_response(
+        self, responses: dict[str, LLMJudgeResponse]
+    ) -> dict[str, Any]:
         """Formats the response from the judge into a dictionary."""
         formatted_response = {}
         for factor, response in responses.items():
@@ -64,12 +70,11 @@ class LLMJudge:
 
         return self._format_response(judgement)
 
-    def call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
+    def call_judge(self, input, output, expected) -> dict[str, LLMJudgeResponse]:
         """Provides a response for each of the factors specified in the prompt.
         This must be implemented by subclasses.
         """
         raise NotImplementedError()
-
 
 
 ####################################################################################
@@ -81,7 +86,7 @@ def patched_get_completion(
     temperature: float,
     max_tokens: int,
     seed: int,
-    response_format: dict = None,
+    response_format: dict | None = None,
     response_model=None,
 ):
     """Monkey-patch the get_completion method to use the openai_client."""
@@ -92,13 +97,16 @@ def patched_get_completion(
 
     return openai_client().beta.chat.completions.parse(
         model=model,
-        messages=messages,
+        messages=messages,  # type: ignore
         temperature=temperature,
         max_tokens=max_tokens,
         seed=seed,
-        response_format=response_format,
+        response_format=response_format,  # type: ignore
     )
+
+
 judges_lib.base.get_completion = patched_get_completion
+judges_lib._client.get_completion = patched_get_completion
 # End of monkey patching.
 ####################################################################################
 
@@ -113,7 +121,7 @@ class PollMultihopCorrectnessWrapper(LLMJudge):
         )
         self.judge = judges_lib.PollMultihopCorrectness(model=model_name)
 
-    def call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
+    def call_judge(self, input, output, expected) -> dict[str, LLMJudgeResponse]:
         """Calls the PollMultihopCorrectness judge and formats the response."""
         # Call judge.
         model_response = self.judge.judge(input=input, output=output, expected=expected)
@@ -136,7 +144,7 @@ class MTBenchChatBotResponseQualityWrapper(LLMJudge):
         )
         self.judge = judges_lib.MTBenchChatBotResponseQuality(model=model_name)
 
-    def call_judge(self, input, output, expected) -> dict[LLMJudgeResponse]:
+    def call_judge(self, input, output, expected) -> dict[str, LLMJudgeResponse]:
         """Calls the MTBenchChatBotResponseQuality judge and formats the response."""
         # Call judge.
         model_response = self.judge.judge(input=input, output=output, expected=expected)
