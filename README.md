@@ -24,8 +24,6 @@ source .venv/bin/activate
 pip install .[all]
 ```
 
-To reproduce the experiments, head over to [reproduce](reproduce/).
-
 ## H&S Demo app
 
 <img width="741" height="599" alt="image" src="https://github.com/user-attachments/assets/4334aac5-8e3c-44da-a02a-e704423a06d0" />
@@ -42,6 +40,14 @@ cd demo
 bash run.sh
 ```
 **Note** By default, the demo app listens on `0.0.0.0`. You may want to change this to `localhost` by editing `demo/run.sh`.
+
+## Reproducing the paper's experiments
+
+To reproduce the experiments, head over to [reproduce](reproduce/).
+
+## Lean 4 proofs
+
+To check out the proofs of our theory section.
 
 --------------------
 

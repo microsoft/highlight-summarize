@@ -1,0 +1,6 @@
+dataset: repliqa_3-subsampled
+default_model_name: gpt-4.1-mini
+model_name: gpt-4.1-mini
+pipeline: QAEvaluator
+results_dir: results/
+temperature: 0.2

@@ -25,25 +25,15 @@ class QAEvaluator:
         sleep_time_between_retrials: float = 1.0,
         max_sleep_time_between_retrials: float = 600.0,
     ) -> None:
-
-        self.model_name = model_name
         self._base_system_prompt = (
             "You are an expert research assistant, skilled in answering questions "
             "concisely and precisely, using information provided by the user. "
         )
         self._base_user_prompt = (
-            "I'd like for you to answer questions about a context text that will be provided."
-            "I'll give you a pair with the form:\nContext: 'context text'\nQuestion: 'a question about the context'.\n"
-            "First, tell me about your knowledge of the context and what information it contains, "
-            "then, create an analysis of the context strictly using information contained in the text provided. "
-            "Your knowledge about the context and the analysis must not be output. "
-            "Finally, generate an explicit answer to the question that will be output. "
-            "Make sure that the answer is the only output you provide, and the analysis of the context should be kept to yourself. "
-            "Answer directly and do not prefix the answer with anything such as 'Answer:' nor 'The answer is:'. "
-            "The answer has to be the only output you explicitly provide. "
-            "The answer has to be as short, direct, and concise as possible. "
-            f"If the answer to the question can not be obtained from the provided context paragraph, output '{NOANSWER_PRED}'. "
-            "Here's the context and question for you to reason about and answer:\n"
+            "Answer the following question based on the provided context.\n"
+            "The answer must be 1-2 sentences, as short, direct, and concise as possible.\n"
+            "Do not prefix the answer with anything such as 'Answer:' or 'The answer is:'.\n"
+            f"If the answer cannot be obtained from the context, output '{NOANSWER_PRED}'.\n"
             "Context:\n"
             "{context}\n"
             "Question: {question_str}?\n"
@@ -63,6 +53,8 @@ class QAEvaluator:
         Returns:
             tuple[str, dict[str, Any]]: A tuple containing the answer as well as any other metadata.
         """
+        assert self.model_name is not None, "model_name cannot be None"
+
         system_prompt_str = self._base_system_prompt
         user_prompt_str = self._base_user_prompt.format(
             context=context_str,
@@ -85,7 +77,7 @@ class QAEvaluator:
             return QAPrediction(answer_pred=FAILED_PRED, llm_response=model_response)
 
         return QAPrediction(
-            answer_pred=model_response.split(":")[-1].strip(),
+            answer_pred=model_response.strip(),
             llm_response=model_response,
             model_name=self.model_name,
             temperature=self.temperature,

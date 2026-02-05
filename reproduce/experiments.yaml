@@ -2,51 +2,61 @@
 base_experiment: &base
     results_dir: "results/"
     temperature: 0.2
+    default_model_name: &default_model "gpt-4.1-mini"
 
 # The experiments to run.
 experiments:
     rag_experiment:
         <<: *base
         pipeline: "QAEvaluator"
-        model_name: "gpt-4.1-mini"
+        model_name: *default_model
 
     hsbaseline_experiment:
         <<: *base
         pipeline: "HSBaseline"
-        highlighter_model_name: "gpt-4.1-mini"
-        summarizer_model_name: "gpt-4.1-mini"
+        highlighter_model_name: *default_model
+        summarizer_model_name: *default_model
 
     hsstructured_experiment:
         <<: *base
         pipeline: "HSStructuredHighlighter"
-        highlighter_model_name: "gpt-4.1-mini"
-        summarizer_model_name: "gpt-4.1-mini"
+        highlighter_model_name: *default_model
+        summarizer_model_name: *default_model
+
+    hsspan_experiment:
+        <<: *base
+        pipeline: "HSSpanHighlighter"
+        highlighter_model_name: *default_model
+        summarizer_model_name: *default_model
 
     hsbert_experiment:
         <<: *base
         pipeline: "HSBERTExtractor"
         highlighter_model_name: "models/microsoft-deberta-v3-base-repliqa"
-        summarizer_model_name: "gpt-4.1-mini"
+        summarizer_model_name: *default_model
 
     hsbert_experiment_squad:
         <<: *base
         pipeline: "HSBERTExtractor"
         highlighter_model_name: "deepset/deberta-v3-base-squad2"
-        summarizer_model_name: "gpt-4.1-mini"
+        summarizer_model_name: *default_model
+
+    hstwosteps_experiment:
+        <<: *base
+        pipeline: "HSTwoStepsHighlighter"
+        highlighter_model_name: *default_model
+        summarizer_model_name: *default_model
 
 # The datasets to use in the experiments.
 datasets:
   - repliqa_3
   - bioasq
-  - repliqa_3-subsampled
-  - bioasq-subsampled
 
 judges_config:
     model_name: "gpt-4.1-mini"
-    temperature: 0
     judges:
       - PollMultihopCorrectness
       - ReliableCIRelevance
       - MTBenchChatBotResponseQuality
 
-max_threads: 30 
+max_threads: 30

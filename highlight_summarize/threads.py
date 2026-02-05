@@ -2,8 +2,9 @@
 
 import time
 import datasets
-import concurrent
+import concurrent.futures
 from tqdm import tqdm
+from typing import Callable
 
 MAX_THREADS = 50
 
@@ -31,7 +32,7 @@ class Counter:
         self.display()
 
 
-def mt_exec(example: dict, function: callable) -> dict:
+def mt_exec(example: dict, function: Callable) -> dict:
     """Contains all the thread logic for launching the function, including sleeping and error handling.
 
     If it fails, it waits 2x the time it waited before, until a limit of >32
@@ -67,7 +68,7 @@ def mt_exec(example: dict, function: callable) -> dict:
 
 
 def mt_map(
-    function: callable, dataset: datasets.Dataset, max_threads: int = MAX_THREADS
+    function: Callable, dataset: datasets.Dataset, max_threads: int = MAX_THREADS
 ) -> datasets.Dataset:
     """Maps a function over a dataset using multiple threads."""
     global counter  # Gives us fancy stats and a progress bar.
@@ -79,25 +80,36 @@ def mt_map(
         # Global counter for threads stats data.
         counter = Counter(pbar)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
-            # Start the load operations and mark each future with its example id.
-            future_to_example = {
-                executor.submit(
-                    mt_exec,
-                    example=dataset_dict[ex_id],
-                    function=function,
-                ): ex_id
-                for ex_id in dataset_dict
-            }
-            for future in concurrent.futures.as_completed(future_to_example):
-                ex_id = future_to_example[future]
+        if max_threads == 0:
+            # Run sequentially without threading.
+            for ex_id, example in dataset_dict.items():
                 try:
-                    res = future.result()
+                    res = mt_exec(example=example, function=function)
                 except Exception as e:
                     print(f"Failed{ex_id}: {e}")
                 else:
                     dataset_dict[ex_id].update(res)
                 pbar.update(1)
+        else:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
+                # Start the load operations and mark each future with its example id.
+                future_to_example = {
+                    executor.submit(
+                        mt_exec,
+                        example=dataset_dict[ex_id],
+                        function=function,
+                    ): ex_id
+                    for ex_id in dataset_dict
+                }
+                for future in concurrent.futures.as_completed(future_to_example):
+                    ex_id = future_to_example[future]
+                    try:
+                        res = future.result()
+                    except Exception as e:
+                        print(f"Failed{ex_id}: {e}")
+                    else:
+                        dataset_dict[ex_id].update(res)
+                    pbar.update(1)
 
     # Convert back to a Dataset.
     return datasets.Dataset.from_list(list(dataset_dict.values()))

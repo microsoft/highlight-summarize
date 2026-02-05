@@ -1,0 +1,7 @@
+dataset: repliqa_3-subsampled
+default_model_name: gpt-4.1-mini
+highlighter_model_name: models/microsoft-deberta-v3-base-repliqa
+pipeline: HSBERTExtractor
+results_dir: results/
+summarizer_model_name: gpt-4.1-mini
+temperature: 0.2

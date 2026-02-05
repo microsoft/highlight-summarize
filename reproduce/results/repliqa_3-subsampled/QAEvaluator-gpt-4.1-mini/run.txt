@@ -1,0 +1,1 @@
+Elapsed time for predictions: 31.34 seconds. Average: 0.78 seconds per example.
