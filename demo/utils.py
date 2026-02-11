@@ -30,5 +30,5 @@ def sidebar():
     with st.sidebar:
         st.title("Highlight & Summarize")
         st.markdown("A RAG design pattern for secure, high-quality LLM-based question answering.")
-        st.markdown("📖 [Read the paper](app/static/highlight-summarize.pdf)")
+        st.markdown("📖 [Read the paper](https://arxiv.org/abs/2508.02872)")
         st.markdown('<img src="https://pngimg.com/d/github_PNG40.png" width="30"> [Code](https://github.com/microsoft/highlight-summarize)', unsafe_allow_html=True)

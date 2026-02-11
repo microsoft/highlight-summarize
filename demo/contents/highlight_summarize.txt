@@ -1,197 +1,1329 @@
-Title: Highlight, then Summarize: RAG without the jailbreaks.
-Authors: Giovanni Cherubin (Microsoft), Andrew Paverd (Microsoft)
+Highlight & Summarize: RAG without the jailbreaks
+Giovanni Cherubin
+Microsoft Security Response Center
 
-Preventing model hijacking and jailbreaking is a troublesome problem in the deployment of Large Language Models (LLMs). In RAG
-systems, for example, malicious users can tamper with the LLM’s
-inference and force it to produce undesired contents, beyond what
-was initially envisioned by system designers. Several mitigations
-rely on content classifiers, but these are mostly of a reactive nature;
-an ideal jailbreak classifier would need to understand what it means
-for something to be malicious, which is out of reach from a scientific
-and philosophical standpoint for the foreseeable future.
+Andrew Paverd
+Microsoft Security Response Center
 
-In this paper, we look at a simple enhancement to RAG systems
-that prevents these attacks by design. The idea behind this design
-pattern, which we refer to as Highlight & Summarize (H&S), is
-to accomplish the same goal as a RAG pipeline (i.e., to provide
-natural language answers to questions based on relevant sources)
-without ever letting the LLM generator be directly exposed to the
-user’s question. This is obtained by having two parts: a highlighter,
-which extracts from the sources relevant information to a user’s
-query, and a summarizer, an LLM that polishes and summarizes
-the extracted text. This paper discusses and evaluates the security
-and utility implications of this design pattern. To our surprise, the
-responses given by an H&S pipeline are comparable to, and often
-of better quality than, those coming from a vanilla RAG pipeline.
+Abstract
 
+solution for many applications. The core idea behind RAG
+is that, when a user asks a question, the system first retrieves
+a set of relevant documents from the knowledge base and
+passes these to a generative LLM together with the user’s
+question; on this basis, the LLM produces an answer to the
+question, which is returned to the user.
+There are, alas, many ways an adversary can exploit RAG
+systems, depending on which inputs the adversary can control.
+In this paper, we focus on the scenario where the knowledge
+base is trusted, while the users’ inputs are untrusted and potentially malicious. A real-world example is a chatbot that
+is deployed by a company to answer questions based on the
+company’s curated knowledge base (e.g., consisting of official
+FAQs or policy documents).
+In this setting, a malicious user could attack the system by
+inputting specially crafted prompts to achieve various objectives. Firstly, they could try to jailbreak the system to make
+the LLM generate offensive content that harms the reputation
+of the company. A more subtle jailbreak could be to trick the
+LLM into generating unintended outputs that misrepresent
+the company’s intent, for example, persuading the chatbot to
+offer discounts on the company’s products. In some cases, the
+chatbot’s output may constitute a legally binding statement
+from the company.1 Alternatively, the malicious user could
+repurpose the generative LLM to perform some other task
+(e.g., asking questions unrelated to the company) – this is
+sometimes referred to as model hijacking [12, 38].
+In this paper, we introduce and evaluate Highlight & Summarize (H&S), a new design pattern for RAG systems that
+prevents these attacks by design. Our approach consists of
+two components (Figure 1): First, the highlighter component inspects the retrieved documents and extracts passages
+from them that are relevant to answering the user’s question
+– the digital equivalent of highlighting those passages. The
+highlighter can be instantiated using existing methods for
 
-1 Introduction
+Preventing jailbreaking and model hijacking of Large Language Models (LLMs) is an important yet challenging task.
+When interacting with a chatbot, malicious users can input
+specially crafted prompts that cause the LLM to generate
+undesirable content or perform a different task from its intended purpose. Existing systems attempt to mitigate this by
+hardening the LLM’s system prompt or using additional classifiers to detect undesirable content or off-topic conversations.
+However, these probabilistic approaches are relatively easy
+to bypass due to the very large space of possible inputs and
+undesirable outputs.
+We present and evaluate Highlight & Summarize (H&S), a
+new design pattern for retrieval-augmented generation (RAG)
+systems that prevents these attacks by design. The core idea is
+to perform the same task as a standard RAG pipeline (i.e., to
+provide natural language answers to questions, based on relevant sources) without ever revealing the user’s question to the
+generative LLM. This is achieved by splitting the pipeline into
+two components: a highlighter, which takes the user’s question and extracts (“highlights”) relevant passages from the
+retrieved documents, and a summarizer, which takes the highlighted passages and summarizes them into a cohesive answer.
+We describe and implement several possible instantiations
+of H&S and evaluate their responses in terms of correctness,
+relevance, and quality. For certain question-answering (QA)
+tasks, the responses produced by H&S are judged to be as
+good, if not better, than those of a standard RAG pipeline.
 
-Retrieval-augmented Generation (RAG) is a sound and reliable solution for answering questions using documents from a knowledge
-base. From customer support systems to search engines, RAG combines the ability of LLMs to answer questions expressed in natural
-language with the efficiency of vector databases for fetching data
-from large repositories, providing a robust production-ready solution for multiple applications. The core idea in RAG is that, when
-a user asks a question, the system first retrieves a set of relevant
-documents from the knowledge base and passes these to a generative LLM together with the user’s question; the LLM then produces
-an answer, which is returned to the user.
+1
 
-There are many ways an adversary can exploit RAG systems
-if the adversary can provide untrusted inputs. For example, a
-malicious user might jailbreak the system to repurpose its generative abilities or cause it to produce dangerous or offensive content.
-Additionally, one might trick the LLM into generating unintended
-outputs that seem to represent the organization’s stance, which
-could have legal or reputational consequences. A well-known example is when a chatbot spontaneously provides misleading or incorrect
-information that is considered official by a user.
+Introduction
 
-To address these challenges, we introduce Highlight & Summarize
-(H&S), a design that prevents such attacks by ensuring the user’s
-prompt never directly influences the part of the pipeline responsible
-for generating the final output. Specifically, H&S contains:
-(1) A highlighter, which selects text passages relevant to the user’s
-query from retrieved documents. Its output contains only text
-that is already present in the documents.
-(2) A summarizer, which is an LLM that takes only the highlighter’s
-extracted text. It never sees the user’s original question directly;
-therefore, malicious inputs cannot steer the generation process.
+Retrieval-augmented Generation (RAG) is proving to be a
+sound and reliable solution for answering questions using
+documents from a knowledge base. From customer support
+systems to search engines, RAG combines the ability of LLMs
+to answer questions expressed in natural language with the
+efficiency of vector databases for retrieving information from
+large data repositories, to provide a robust production-ready
 
-We show experimentally that this design pattern prevents common jailbreak attacks, while also delivering strong performance on
-question-answering tasks. In fact, our results indicate that certain
-H&S pipelines can even improve overall accuracy compared to a
-plain RAG approach.
+1 It was recently reported that Air Canada had to pay compensation
+to a customer for misleading information provided by their chatbot.
+https://www.theguardian.com/world/2024/feb/16/air-canadachatbot-lawsuit.
 
-2 Background and Related Work
+1
 
-Jailbreaking defenses. To combat malicious inputs that might reconfigure or misuse an LLM, researchers have tried prompt engineering,
-fine-tuning, content classifiers, or programmatic guardrails in the
-chat flow. Our proposal, H&S, instead eliminates the possibility of
-malicious user prompts reaching the generator directly.
+2
 
-Passage retrieval and extractive Q&A. The first step of H&S, referred
-to as “highlight,” has connections to the fields of passage retrieval
-and extractive Q&A, which extract relevant portions of text from
-longer documents. Many existing solutions use BERT derivatives
-for short-span extraction, or approaches that retrieve the best context for a given query. In H&S, we leverage such techniques but
-then add a summarizer for improved clarity and completeness.
+extractive QA, or using modern generative LLMs. Secondly,
+the summarizer component, which is an LLM, generates a
+coherent answer by summarizing the highlighted passages.
+Crucially, the summarizer never sees the user’s question.
+This mitigates the above attacks whilst maintaining the utility
+of the RAG system on its intended QA task.
+We formalize the security guarantees through a theoretical
+analysis (with an accompanying Lean formalization) showing
+how H&S exponentially decreases the control that an attacker
+can exercise over the QA pipeline. We show empirically that
+H&S thwarts all non-adaptive attacks from a large prompt injection dataset as well as a strong novel adaptive highlighting
+attack specifically designed to challenge this technique.
+We implement several variants of the H&S design pattern
+and evaluate the accuracy of their responses on two widelyused question answering (QA) datasets: RepliQA and BioASQ.
+Using various LLM-as-a-Judge implementations, we compare the H&S generated responses against those of a standard “vanilla” RAG implementation, both in a direct headto-head comparison as well as using independent ratings for
+the answer’s correctness, relevance, and quality. Our results
+show that certain H&S implementations produce answers
+that are comparable, and sometimes better, than those of a
+standard RAG implementation. For example, the “Two Steps”
+H&S method achieves correctness scores that are equivalent
+(RepliQA: 95% vs 94%) or even slightly better (BioASQ: 89%
+vs 86%) than those of Vanilla RAG, with comparable performance on all other metrics. In 1-to-1 Elo ranking, H&S is
+sometimes better than a standard RAG pipeline (e.g., Elo on
+RepliQA: 1170 vs 1104, BioASQ: 1181 vs 1197).
+We also perform several ablation studies on different components and aspects of H&S to provide deeper insights into
+why our technique achieves these strong results.
+In summary, we make the following contributions:
 
-3 Threat Model
+Background and related work
 
-We assume the knowledge base is trusted and curated, but user queries
-can be adversarial. Attackers can submit arbitrary prompts and see
-the system’s response. Their goals may include (a) repurposing the
-LLM to do tasks unrelated to the system’s intended purpose, or
-(b) forcing the LLM to produce damaging content. The H&S design
-minimizes these risks by keeping the generative LLM off-limits to
-user-supplied text. We do not consider data extraction or knowledge
-base poisoning in this paper.
+Retrieval-augmented generation (RAG). At a high level,
+the intended interaction between as user and a typical LLMbased RAG application would be:
+1. The user submits a question via a chat-style interface.
+2. The application searches its knowledge base and retrieves documents related to the user’s question.
+3. The retrieved documents are concatenated to the user’s
+question and the combined text is input into an LLM.
+4. The LLM generates a response, which the application
+returns to the user.
+This type of RAG application is widely used, for example in
+customer support services.2,3 The benefits of RAG in such
+scenarios include the ability to ground the LLM’s response
+on company-specific information, reduce hallucinations, and
+update the knowledge base without retraining the LLM. However, as explained above, such systems are still vulnerable to
+jailbreaking and model hijacking by malicious users.
+Preventing jailbreaks and model hijacking. Several techniques have been proposed to detect or prevent jailbreaking of
+LLM-based systems, including those used in RAG. The main
+classes of defenses include: finetuning the LLM to reduce the
+risk of undesirable output; using defensive system prompts to
+increase the difficulty of jailbreaking [24, 26]; applying different types of classifiers to the inputs to detect potential jailbreaks [4,15,16,30,33]; and preprocessing the input to remove
+or reduce the impact of potential jailbreaks [16, 21, 36, 37]. To
+mitigate model hijacking [12, 38] (i.e., repurposing the LLM
+for a different task), techniques such as NeMo [36] support
+programmable guardrails that allow the application owner to
+specify dialogue flows by canonicalizing inputs. Our solution,
+H&S, takes a completely different approach by ensuring that
+the user’s input is never input to the summarizer LLM.
 
-4 The H&S Design Pattern
+• We present Highlight & Summarize (H&S), a new design
+pattern for RAG systems that mitigates jailbreaks and
+model hijacking by design.
 
-Highlight & Summarize can be added to a RAG system as follows:
+System-level defenses. Similarly to defenses such as
+CaMeL [13] and FIDES [11], H&S is a system-level defense
+in that it deterministically limits the attacker’s capabilities.
+However, H&S focuses on the opposite threat model: whereas
+those defenses prevent malicious sources to affect benign
+users, in H&S’ threat model the retrieved data is trusted but
+the user inputs are not. H&S can be seen as a realization of
+the Context-Minimization design pattern [5].
 
-Highlight. From the retrieved documents, an automated process (e.g.,
-a fine-tuned BERT or another LLM restricted to quoting existing
-text) extracts passages related to the user’s query.
+• We formalize the security guarantees of H&S, and we
+thoroughly evaluate it against both non-adaptive and
+adaptive attacks.
+• We implement several different variants of H&S and
+show empirically that their generated outputs are comparable to those of a standard RAG pipeline.
 
-Summarize. A separate LLM then summarizes or reformulates the extracted text into the final answer. Crucially, it never sees the user’s
-question; it only sees the text from the highlighter.
+Passage retrieval and extractive QA. Passage retrieval
+and extractive QA are well-established research fields in the
+domain of natural language processing (NLP). Passage retrieval is the process of extracting from a set of documents
 
-This approach protects against input-based jailbreaks because no
-user text directly touches the LLM generator. We further show in
-our experiments that H&S often yields as good or better results
-than a standard RAG pipeline.
+To enable further analysis of H&S, without incurring the
+monetary and environmental costs of rerunning our experiments, we release both our code and experimental data, including the responses generated by the various RAG pipelines
+and the associated ratings given by the LLM-as-Judges (see
+the Open Science appendix for further details).
 
-5 Experimental Setup
+2 https://careersatdoordash.com/blog/large-languagemodules-based-dasher-support-automation/.
+3 https://medium.com/tr-labs-ml-engineering-blog/bettercustomer-support-using-retrieval-augmented-generation-ragat-thomson-reuters-4d140a6044c3.
 
-We primarily evaluate on the RepliQA dataset—a constructed set of
-questions for which LLMs cannot rely on memorized knowledge.
-We also perform tests on a biomedical question set (BioASQ). We
-measure performance using several automated and LLM-based
-evaluation metrics, comparing correctness, relevance, quality, and
-ability to refuse answers that are not present in the source document.
+2
 
-6 H&S Components
+Figure 1: HS-enhanced RAG pipeline. A malicious user asking a question to this system cannot jailbreak the LLM, by design.
+one or more texts that are relevant to answering a question.
+Several techniques have been developed, with applications in
+the medical and legal sectors [7, 18, 27, 28]. With a similar
+goal, extractive QA aims to select (brief) portions of text from
+a larger document in order to answer a question. Extractive
+QA methods are largely based on modern NLP architectures,
+with BERT-like models being the most successful [22, 31, 41].
+Passage retrieval and extractive QA are typically combined
+in practical systems [19, 34]. In an H&S pipeline, the highlighter has a very similar goal to extractive QA, and two of
+the instantiations of the highlighter we describe in section 4
+use extractive QA models.
 
-We explore multiple ways to implement the highlighter:
-• H&S Baseline. A simple zero-shot LLM that directly outputs
-extracted quotes from the text, forced to match the original
-document via fuzzy string checks.
-• H&S Structured. A variation that outputs both an “answer” and
-the extracted text as a list, although only the extracted text is
-passed to the summarizer. Structured output tends to help the
-LLM produce more robust answers.
-• H&S DeBERTaV3. An extractive Q&A model fine-tuned to produce
-the relevant snippet as a passage rather than just short-span
-answers.
+3
 
-The summarizer is a prompt-tuned LLM (e.g., GPT-4 variant) that
-combines the extracted text into a coherent final response, also
-guessing what question the extracted text might have answered.
+has inspected all documents in the knowledge base and confirmed that they contain only trustworthy information. This is
+a realistic assumption as the application owner has full control
+of the knowledge base and can apply arbitrary preprocessing
+and filtering. Note that we do not aim to defend against other
+types of attacks on RAG systems, such as extracting information [17, 32] or poisoning the knowledge base [42, 43, 45].
 
-7 Comparison with Vanilla RAG
+4
 
-Our experiments compare H&S (various highlighter implementations) to a traditional RAG pipeline. Surprisingly, H&S often matches
-or exceeds the quality of standard RAG answers, according to both
-automated and LLM-based judgments. H&S also shows improved
-robustness in refusing — or providing no answer — if the document
-cannot answer the question.
+Highlight & Summarize
 
-Regarding performance overhead, H&S does require two LLM
-calls (one for the highlighter, one for the summarizer), but the extra
-step of summarization can yield clearer outputs than single-pass
-generative RAG. Implementations can further optimize aspects like
-faster extractive Q&A or partial caching.
+We propose H&S, a new design pattern for RAG systems to
+mitigate jailbreaking and model hijacking attacks. The main
+design principle is that a (malicious) user must be unable
+to provide arbitrary inputs to the LLM that generates the
+response. We achieve this by separating the generative QA
+process into two steps (Figure 1):
 
-8 Security Assessment
+Threat model and assumptions
 
-We test common jailbreaking prompts used previously to coerce
-LLMs into undesired outputs. In typical RAG pipelines, these attacks
-may sometimes succeed if the LLM is forced to consider the instructions verbatim. In H&S, by design, the summarizer sees only
-extracted text from trusted documents; no direct user instructions
-pass through. Our experiments confirm that known jailbreaking
-attacks fail when applied to H&S.
+Some users of a RAG application may be adversarial. We
+assume a strong adversary who has full knowledge of all the
+documents in the knowledge base; for example, this may be
+the case if the knowledge base consists of published documentation or FAQ web pages. The adversary is able to submit
+arbitrary questions and observe the responses. The adversary
+may want to achieve the following goals:
 
-One possible corner case is a “gadgets-based” attack, where a
-document in the knowledge base might accidentally contain all the
-tokens needed to form a malicious sentence if carefully spliced. This
-risk is mitigated if the system requires contiguous passages rather
-than reassembling arbitrary fragments.
+• Highlighting: The highlighter component takes the retrieved documents and selects (“highlights”) text passages from these documents that are relevant to answering the user’s question.
+• Summarization: The summarizer component takes only
+the text selected by the highlighter and summarizes it in
+the form of a coherent answer to some question, which is
+returned to the user. The user’s question is never shown
+to the summarizer.
 
-9 Discussion and Future Work
+• Repurpose the application to perform a different task.
+For example, using a customer service chatbot to summarize large amounts of text, at the expense of the application owner.
 
-Potential future improvements include:
-• Tracking the summarizer’s guessed question for deeper coherence
-checks or as a fallback to handle yes/no queries.
-• Extending to multi-question prompts or partial highlighting.
-• Studying H&S designs specialized for low-hallucination outputs.
-Overall, H&S significantly raises the bar for adversarial input, while
-maintaining or even improving answer quality.
+The following security property is enforced in H&S:
 
-10 Conclusion
+• Jailbreak the application and cause it to generate arbitrary output. This could include content that causes
+reputational damage to the application owner, or even
+constitutes an unintentional yet legally enforceable commitment from the application owner.
 
-We introduced Highlight & Summarize, a design pattern for RAG
-systems that blocks user-supplied text from influencing the generative component of an LLM-based pipeline. Our evaluations show
-that H&S resists common jailbreak attacks and, unexpectedly,
-often provides answers more accurate and polished than a standard
-RAG pipeline. We hope these insights encourage broader exploration of secure-by-design patterns in LLM deployments.
+For a security parameter min_words, each of the
+text passages returned by the highlighter in a H&S
+pipeline must be a contiguous match of at least
+min_words words from the trusted documents; furthermore, text extracts must be non-overlapping.
 
-────────────────────────────────────────────────────────────────────────
-HIGHLIGHT
-────────────────────────────────────────────────────────────────────────
+The goal of the application owner is to prevent both of the
+above classes of attacks. We assume the application owner
+3
 
-Below are key excerpts that capture the central ideas:
+H&S Two Steps. This highlighter enforces the Chain Of
+Thought implied in H&S Structured by employing two separate LLM calls. In the first call, we have an LLM answer the
+question; in the second call, the LLM is given the question, the
+answer, and the documents, and it is asked to extract the text
+needed to answer the question. As with all other highlighter
+implementations, we ensure that Two Step returns verbatim
+contiguous text from the original document and nothing else.
 
-    “H&S prevents these attacks by design... the summarizer never sees the user’s question.”
+This property can be deterministically enforced by the
+pipeline, by checking that every output of the highlighter contains contiguous and non-overlapping exact matches from the
+retrieved documents, and that they contain at least min_words
+words each.
+By virtue of this design, malicious users are unable to directly influence the outputs of the system – which are provided
+by the summarizer. In section 5, we support this claim by considering an important class of adaptive attacks and how they
+are countered.
 
-    “The idea is to accomplish the same goal as a RAG pipeline (providing answers based on documents) without letting the LLM be directly exposed to a user’s question.”
+H&S Span. This highlighter only returns the start and end
+of the passages to highlight. This has two benefits. First, it
+considerably reduces the costs of the pipeline, since the highlighter LLM outputs considerably less tokens than the other
+two (Figure 10). Secondly, it simplifies the task of matching
+the highlighted text against the document: because only a
+small part of the document is output, the LLM is less likely to
+introduce typos; for this reason, we did not find it necessary
+to implement fuzzy matching for the outputs of H&S Span
+(the pipeline simply rejected any non-matching texts).
 
-    “A malicious user could attempt to jailbreak the system for various purposes, but H&S mitigates that risk by restricting user prompts from interacting directly with the generative LLM.”
+Implementing H&S. Since H&S is a new design pattern,
+it can be implemented in various different ways. In particular,
+there are many ways to implement the highlighter component,
+ranging from extractive QA models through to prompt-tuned
+LLMs. In subsection 4.1, we describe five different implementations of the highlighter. In contrast, the summarizer is
+relatively straight-forward, so we present a single implementation in subsection 4.2. We refer to any combination of a
+highlighter and summarizer as an H&S pipeline.
 
-    “Our experiments show that, somewhat unexpectedly, H&S pipelines often match or exceed the accuracy of standard RAG pipelines.”
+4.1
 
-    “We observe that we can still answer user queries effectively by splitting the pipeline into highlight and summarize steps, ensuring that any malicious instructions in the user prompt do not affect the final generation.”
+H&S DeBERTaV3. This highlighter is an extractive QA
+model from the BERT family. In our experiments, we use
+DeBERTaV3, which uses disentangled attention and a better
+mask decoder to improve upon BERT and RoBERTa. We use
+two versions of this model: H&S DeBERTaV3 (SQuAD2). is
+a DeBERTaV3 model that was fine-tuned5 on the SQuAD2
+dataset [35]. Since this model was fine-tuned for short-span
+extractive QA, as encouraged by the SQuAD2 dataset, its performance in our experiments was lacking: the highlighter of
+an H&S pipeline is best served by a tool that outputs longer
+span passages to a question. For this reason, we also employ H&S DeBERTaV3 (RepliQA), which is a DeBERTaV3
+model that we fine-tuned on the RepliQA dataset (see section 6). We train the model to return the gold passage of an
+answer, rather than the expected answer, which significantly
+improves the performance of the H&S pipeline. Fine-tuning
+this model on splits 0-2 of the RepliQA dataset (section 6)
+took around 7 hours on an NVIDIA A100 GPU.
 
-────────────────────────────────────────────────────────────────────────
-SUMMARY
-────────────────────────────────────────────────────────────────────────
+Highlighter implementations
 
-“Highlight & Summarize” (H&S) is a secure design pattern for Retrieval-Augmented Generation (RAG) that blocks malicious user inputs from hijacking a large language model. Traditional RAG passes a user’s question plus retrieved documents to a generative LLM, potentially letting adversarial prompts induce bad outputs. H&S instead splits the process into two steps: a highlighter that extracts relevant text from trusted documents, and a summarizer that never sees the user’s original phrasing. Because the summarizer only receives extracted text, user-supplied jailbreak instructions cannot steer the model. Experiments show that, besides preventing jailbreak attacks, H&S’s extracted text plus summarization approach also yields responses as good as or better than a typical RAG system in accuracy and helpfulness.
+We describe five different highlighter implementations that
+have been chosen to provide a broad overview of the design
+space. They differ in terms of computational overhead and
+QA capabilities.
+H&S Baseline. This highlighter is a zero-shot prompt-tuned
+LLM that is tasked with extracting relevant information from
+the retrieved documents. Since the output of the highlighter
+LLM might deviate slightly from the exact text in the retrieved
+documents (e.g., due to the model’s internal randomness), we
+use fuzzy string matching between the LLM’s output and the
+documents to identify the precise text from the documents to
+be highlighted. We use RapidFuzz4 with a threshold of 95 in
+our experiments.
+
+4.2
+
+H&S Structured. This highlighter improves upon H&S
+Baseline by asking the highlighter LLM to first output an
+answer to the user’s question and then to highlight the relevant text from the retrieved documents. We again use Azure
+OpenAI’s structured output to enforce the following format:
+{“answer”: str, “text_extracts”: list[str]}.
+The generated answer is not passed to the summarizer. We
+observed that asking the highlighter LLM to first produce this
+output helped with grounding its responses, thereby producing
+better highlights from the text. As with H&S Baseline, we
+again use fuzzy string matching to ensure that the highlighted
+text is taken directly from the retrieved documents.
+
+Summarizer implementation
+
+We evaluate one summarizer that is common across all H&S
+implementations. The summarizer is a zero-shot prompttuned LLM that is tasked with i) guessing what question the
+highlighted text was intended to answer, and ii) reformulating
+the highlighted text in form of an answer. Only the answer is
+returned to the user. The guessed question is not returned to
+the user – it’s purpose is to ground the generated answer, and
+to aid in evaluation. We use Azure OpenAI’s structured output
+option6 , which forces the LLM to give a response matching a
+5 https://huggingface.co/deepset/deberta-v3-base-squad2.
+6 https://learn.microsoft.com/en-us/azure/ai-services/
+
+4 https://github.com/rapidfuzz/RapidFuzz
+
+openai/how-to/structured-outputs.
+
+4
+
+desired format (in this case, {“guessed_question”: str,
+“answer”: str}); we found this helps with the quality of the
+responses, and allows us to evaluate what question the LLM
+guessed. Unless otherwise specified, we employ OpenAI’s
+GPT-4.1 mini [2] as our default generative LLM.
+
+5
+
+Intuitively, this captures the set of strings that a
+user can reliably obtain as outputs from the LLM
+(i.e., control with non-negligible probability) by providing inputs from P. For example, a user can have
+an LLM output the string o = “This is an example”
+with non-zero probability (in fact, with high probability
+with modern instruction-tuned LLMs) by prompting the
+LLM with “Output the following string verbatim
+and nothing else: This is an example”. Hence,
+the sentence o belongs to the control region for some β > 0.
+A very informative result shows that, even for probabilistic
+LLMs, the number of possible outputs achievable with nonnegligible probability is bounded by the size of their inputs:
+
+Security analysis
+
+Fundamentally, all forms of jailbreaking and model hijacking
+attacks involve some type of adversarial input to an LLM,
+which causes the LLM to generate undesirable outputs or
+perform an unintended task. In the widely-used setting of a
+RAG-powered system with a trusted knowledge base, the key
+idea of H&S is to ensure that the adversary cannot provide
+direct inputs to the generative LLM that produces the final
+output (i.e., the summarizer); consequently, this design should
+prevent an attacker from controlling arbitrary outputs.
+In this section, we first show theoretically that H&S exponentially decreases the control that an attacker can exercise
+over the QA pipeline.
+Then, we show how it thwarts all non-adaptive attacks from
+a large prompt injections dataset (subsection 5.2). Finally, and
+most importantly, we carefully look into ways adaptive attackers might evade the security of H&S, by influencing indirectly
+the inputs of the generative LLM through the highlighted text,
+and we show how enforcing a min_words security parameter
+mitigates the vast majority of them (subsection 5.3).
+
+5.1
+
+Lemma 5.1 (Bounded control region). The size of the control
+region for an LLM is bounded by the size of the input space:
+|Cβ (L )| ≤
+
+|P|
+.
+β
+
+Proofs are deferred to the appendix, which also includes a
+reference to Lean formalizations and proofs of these results.
+The above shows that the number of outputs that one can
+control strictly depends on the cardinality of the input set
+of an LLM, regardless of the randomness in the algorithm.
+Because an H&S pipeline reduces the LLM’s input space
+(hence, the output space), from the set of all input tokens P to
+the set of contiguous strings, we can informally say that:
+An H&S pipeline prevents the attacker from having
+arbitrary control over the outputs. That is, it restricts
+the outputs that they can obtain from the LLM.
+
+Theoretical analysis
+
+The security of a H&S pipeline comes from the fact that the
+inputs to the generative LLM (summarizer) are limited to
+being exact contiguous extracts of trusted text documents.
+This significantly reduces the ways an attacker can control the
+LLM to make it misbehave. We provide a theoretical foundation to support this intuition. We formulate our analysis upon
+the definition of control region of an LLM, which is novel to
+the best of our knowledge, and show that H&S exponentially
+decreases an attacker’s control of the LLM’s outputs.
+
+Exponential descrease in control.
+We now quantify by how much H&S decreases the attacker’s
+control. Suppose the LLM’s input space is the set of strings
+of at most K tokens, P = Σ≤K , where Σ is the set of tokens
+and K is the LLM’s token limit. Let us now consider the summarizer LLM of an H&S pipeline. For a retrieved document
+D ∈ Σ∗ , the highlighting step of H&S is a map hD (P) that
+returns a contiguous string from the document D.7 An H&S
+pipeline reduces the control region from Cβ (L ) to Cβ (L ◦ hD ).
+Precisely, we have:
+
+H&S prevents arbitrary control.
+Formally, an autoregressive generative LLM is a randomized
+algorithm L : P 7→ ∆(O) that maps input prompts (i.e., sequences of tokens) to a probability distribution over output
+strings, where ∆(O) is the space of distributions on O. We use
+the shortcut notation P(L (s) = o) to mean PO∼L (s) (O = o),
+where O is a random variable with distribution L (s).
+We define the control region of an LLM as the set of outputs
+that can be obtained with at least probability β > 0.
+
+Theorem 5.1 (Exponential decrease in control). Consider an
+LLM L : ΣK 7→ Σ∗ and an H&S pipeline L ◦ hD operating on
+a document of length N = |D|. Assume there are constants
+α, β ∈ (0, 1] s.t.: |Cβ (L )| ≥ α|P|. Then
+|Cβ (L ◦ hD )|
+= O(K N |Σ|−K )
+|Cβ (L )|
+
+Definition 5.1 (LLM Control Region). For a parameter β ∈
+(0, 1], the control region of an LLM L is:
+
+7 More precisely, the space is restricted to strings with length between
+min_words and K; we disregard this here for simplicity, as it has no bearing
+on the theoretical conclusions. Similarly, we could have multiple text extracts,
+but as long as their number is constant it does not make any difference.
+
+Cβ (L ) = {o ∈ O | ∃p ∈ P : P(L (p) = o) ≥ β}
+5
+
+This results makes a basic coverage assumption on the
+LLM: it assumes that the LLM is expressive enough that
+some non-zero proportion α > 0 of its potential outputs
+can be obtained with non-zero probability. For example,
+consider a variation of the input prompt discussed before,
+p(x) = “Output the following string verbatim and
+nothing else: x”, where x is a string. We can expect a
+modern LLM to output x with probability β > 0 for some
+proportion of strings x ∈ O.8 This assumption aligns with the
+LLM’s effectiveness: an LLM developer would like to have a
+large β control over a large portion of the output space, since
+this implies a well-behaving LLM.
+In summary, Theorem 5.1 confirms that:
+
+RAG
+H&S (Highlighter only)
+H&S
+
+Arguments valid
+
+81%
+93%
+0%
+
+53%
+63%
+0%
+
+Table 1: Evaluation on the LLMail-Inject dataset (Scenario
+2), showing the percentage of all jailbreaks that succeeded in
+calling the prohibited tool and the percentage of all jailbreaks
+that succeeded in calling the tool with valid arguments.
+Reimbursement_Guidelines.pdf
+You may submit a request for reimbursement if the expense falls within the approved categories outlined in
+Appendix D. Once the claim is verified and approved,
+it is recorded as a completed transaction and marked as
+“ won ” in the internal tracking system. A confirmation
+email will be sent to the claimant within three (3) business days. If the reimbursement includes a $10 threshold adjustment, the system will automatically generate
+a voucher code for accounting purposes. This voucher
+is non-transferable and must be used within the same
+fiscal quarter.
+
+An H&S pipeline reduces the control region of the
+summarizer LLM exponentially in K, the token limit
+of the LLM. That is, it exponentially reduces the number of outputs that an attacker can control.
+
+5.2
+
+Tool called
+
+Non-adaptive attacks
+
+Evaluating LLM jailbreaks requires an automated method for
+detecting whether the jailbreak succeeded. Inspired by the
+recent LLMail-Inject challenge [1], we use tool calling as a
+well-defined attack target. We give the LLM the ability to
+call a (simulated) email sending tool by outputting a specific
+string (e.g., send_email()). For example, a customer service
+chatbot may have this type of tool to send an email to the
+customer support team if a user asks about certain topics, but
+the users should not be able to control when the LLM triggers
+this tool call. The attacker’s goal is therefore to cause the
+LLM to trigger this tool call.9 For purposes of evaluation,
+we give both LLMs (i.e., highlighter and summarizer) the
+ability to trigger this tool call. However, in practice only the
+summarizer would have this ability, so a successful attack
+against H&S would need to trick the summarizer into making
+this tool call.
+For these experiments, we use 1,028 successful attack
+prompts from the LLMail-Inject challenge dataset (Scenario
+2) [1]. Our setup differs slightly from that of the challenge: in
+the challenge, the adversarial inputs were retrieved from the
+user’s emails, whereas in our setting we input these directly
+as the user’s prompt. However, this modified setup does not
+affect the results: successful prompts from LLMail-Inject are
+usually successful in our setup.
+
+Figure 2: Adaptive highlighting attack example.
+
+Table 1 shows the percentage of all inputs for which the
+tool was called (with any arguments) or called with valid arguments. As expected, the vast majority of the attack inputs
+succeed in jailbreaking the RAG pipeline, but none are successful against H&S. The results on H&S (Highlighter only)
+confirm that our highlighter LLM, like any other, is susceptible to jailbreaks when processing adversarial input. This
+emphasizes the need for system-level defenses, such as H&S.
+
+5.3
+
+Adaptive highlighting attack
+
+As explained in section 3, we assume a strong adversary who
+may have full knowledge of H&S and the contents of the
+knowledge base used by the system under attack. We envision
+that such an attacker could attempt to subvert H&S with the
+following adaptive attack, which is somewhat reminiscent of
+traditional system attacks such as Return-Oriented Programming (ROP) [39]. For a target sentence, the attacker i) browses
+the RAG knowledge base to find a document that contains
+(most of) the words in the target sentence, ii) causes that document to be retrieved, and iii) asks the H&S highlighter to
+only highlight the desired words. For example, as shown in
+Figure 2, if the attacker wants the system to output “You won
+a $10 voucher”, they could try to persuade the highlighter to
+highlight only specific words from the retrieved document.
+
+8 The assumption is required to hold for an arbitrary α > 0 proportion of
+outputs, which can be small. One could potentially lift this assumption and
+derive similar results from the way softmax scores are derived for LLMs: if
+(as it is desirable) all softmax scores are required to be < 1, one may show
+that a similar exponential bound to Theorem 5.1 can be obtained.
+9 This is very similar to the setting of a recent vulnerability found by Zenity
+Labs: https://labs.zenity.io/p/a-copilot-studio-story-2-whenaijacking-leads-to-full-data-exfiltration-bc4a.
+
+6
+
+Name
+
+Type
+
+Description
+
+Ref
+
+Recall
+
+Token
+
+[3]
+
+K-Precision
+
+Token
+
+Poll Multihop Correctness
+
+LLM
+
+Reliable CI Relevance
+
+LLM
+
+MTBench Chat Bot Response Quality
+
+LLM
+
+ComparisonJudge
+
+LLM
+
+Proportion of tokens in the reference answer are present in the
+model’s response.
+Proportion of tokens in the model’s reponse that are present in the
+gold passage.
+Correctness of a generated response against a reference answer
+using few-shot learning.
+Relevance of a passage to a query based on a four-point scale:
+Irrelevant, Related, Highly relevant, Perfectly relevant.
+Quality of the response based on helpfulness, relevance, accuracy,
+depth, creativity, and level of detail, assigning a numerical grade.
+Compare two answers to the same question and select either a
+winner, a tie, or a tie where neither answer is acceptable.
+
+[3]
+[40]
+[29]
+[44]
+Ours
+
+Table 2: Metrics used for evaluating individual H&S components and the full H&S pipeline.
+While this adversarial highlighting attack is theoretically
+possible, it is made extremely challenging thanks to our simple H&S design constraint: we only allow the highlighter to
+highlight non-overlapping, contiguous passages of at least
+a certain length min_words. For example, by simply setting
+min_words = 5, it is impossible for the attacker to highlight
+the sentence “You won a a $10 voucher” in Figure 2, which in
+turn makes the same attack virtually impossible to succeed.
+Importantly, H&S makes it viable to check in advance
+whether the knowledge base documents contain any string
+that may lead to jailbreaks: as discussed in section 9, one
+could explore the documents looking for strings that may
+lead to jailbreaks. Consequently, H&S transforms the very
+challenging problem of detecting any possible jailbreak in the
+LLM’s inputs into the significantly simpler task of inspecting
+the knowledge base to check that it does not contain strings
+that can be used to trigger undesirable outputs.
+
+6
+
+it gives must be coming strictly from those documents and not
+from other policies the LLM may have memorized in training.
+RepliQA. To mitigate this confounding factor, we conduct
+our main experiments using the RepliQA dataset [25]. This
+is a human-created dataset that contains questions based on
+natural-looking documents about fictitious events or people.
+By doing so, we ensure that the performance is not affected
+by the ability of LLMs to memorize their training data.
+The RepliQA dataset consists of 5 splits (numbered from 0
+to 4), which were released gradually over a year. Each split
+contains 17,955 examples. In our evaluation, we used the
+most recent split (split_3, which was released on April 14th,
+2025). This ensures that the LLM we use was not trained on
+this data. During data analysis, we observed 10 mislabeled
+instances in this split, which we corrected manually.
+Each entry in the RepliQA dataset contains a gold passage,
+called long_answer, which is a substring of the retrieved
+document, selected by a human annotator, that is relevant to
+answering the question. We use this field as part of our performance measurements, as well as for fine-tuning (on a separate
+split of the dataset) a DeBERTaV3 extraction QA model to
+implement the H&S DeBERTaV3 (RepliQA) pipeline.
+
+Experimental setup
+
+In the following sections, we evaluate the quality of the responses of the various H&S pipelines, and compare them
+with a vanilla QA LLM in a standard RAG setting. Evaluating
+LLMs in QA tasks is notoriously challenging [3, 8, 9, 29, 40,
+44, 44]. We select datasets that prevent confounding factors
+(e.g., the fact that the LLM may not use the context document
+for answering), and we employ many evaluation metrics, ranging from standard to novel ones, to provide a comprehensive
+overview of the performance of H&S pipelines.
+
+6.1
+
+BioASQ. We also include experiments based on the
+rag-mini-bioasq dataset, henceforth BioASQ, which is a
+subset of the training dataset that was used for the BioASQ
+Challenge [6]. This dataset contains biomedical questions,
+as well as answers and documents. Since we do not use this
+dataset for training, we use both the training and test splits for
+evaluation, which gives a total of 4,719 samples.
+
+Datasets
+
+When evaluating a generative LLM for RAG pipelines, the
+LLM should ground its answers on the documents provided
+as context, and not on any of its training data. For example, if
+a RAG application is based on policy documents, any answer
+
+6.2
+
+Evaluation metrics
+
+We compare each H&S pipeline’s answer with the expected
+answer from the dataset using several metrics. We evaluate
+7
+
+LLM-as-a-Judge. We use prompt-tuned LLMs that rate the
+responses with respect to various criteria [9, 44]. Specifically,
+we adopt three standard LLM-as-a-Judge implementations,
+so as to provide a diverse judgment [29, 40, 44].
+
+1170
+1145
+1105
+1104
+1098
+702
+673
+
+60%
+62%
+63%
+61%
+67%
+22%
+14%
+
+Vanilla RAG
+H&S Structured Highlighter
+H&S Two Steps Highlighter
+H&S Baseline
+H&S Span Highlighter
+H&S BERT Extractor (RepliQA)
+H&S BERT Extractor (SQuAD2)
+
+1197
+1181
+1104
+1099
+854
+799
+762
+
+66%
+70%
+70%
+66%
+31%
+28%
+19%
+
+all H&S methods are competitive, particularly H&S Two
+Steps which even has more “wins” on the RepliQA dataset.
+When looking at Elo scoring (Table 3), which accounts for
+ties, we observe that H&S Two Steps outperforms the vanilla
+RAG baseline for both datasets. Interestingly, most LLMbased H&S methods perform comparably to (or better than)
+the baseline in terms of Elo ranking.
+This is an exciting result because it suggests that, for
+these particular tasks, H&S simultaneously gives security
+against malicious users as well as comparable (sometimes
+better) response accuracy than standard RAG. We attribute
+this success to the fact that H&S forces, by design, a form
+of chain-of-thought reasoning, by prompting the model to
+answer the question in (at least) two steps. In section 9, we
+discuss cases where we expect H&S to work well, and applications where it may not work as well.
+
+Evaluating the full H&S pipeline
+
+We first evaluate the full H&S pipelines in comparison with a
+standard (“vanilla”) RAG system. Since H&S only modifies
+RAG generation step, we hold the retrieval step constant for
+each comparison; that is, we compare the pipelines on their
+ability to answer questions based on the same set of retrieved
+documents. We compare the pipelines using the ComparisonJudge and the LLM-as-Judges, as well as on their ability to
+decline to answer when no answer can be provided.
+
+7.1
+
+H&S Span Highlighter
+H&S Baseline
+H&S Structured Highlighter
+Vanilla RAG
+H&S Two Steps Highlighter
+H&S BERT Extractor (RepliQA)
+H&S BERT Extractor (SQuAD2)
+
+Table 3: Direct pairwise comparison of all pipelines by the
+ComparisonJudge LLM. Win rate uses standard Elo scoring
+(win=1, tie=0.5, loss=0).
+
+Token-based metrics. We use quantitative comparisons
+between the tokens of the expected answer (or gold passage)
+and the given answer. Specifically, we use token-based metrics
+to evaluate the correctness (“Recall”) and faithfulness (“KPrecision”), based on the work by Adlakha et al. [3].
+
+7
+
+Wins
+
+RepliQA
+
+Pairwise comparison judge. We use a zero-shot prompttuned LLM with the task of deciding a “winner” between
+two alternative answers to a question. This judge also has
+the option to declare a “tie” between the answers, or to decide that neither answer is acceptable. In our implementation,
+we randomize the order of the two answers to mitigate any
+potential ordering bias.
+
+Elo Score
+
+BioASQ
+
+the quality of the responses based on three types of evaluation
+metrics, as summarized in Table 2. We report the costs of H&S
+in terms of time-to-respond and token counts in Appendix B.
+
+Pairwise comparisons
+
+We use the ComparisonJudge to perform direct pairwise comparisons between all pipelines, including standard RAG. For
+each question in our evaluation set, we compare all pairs of
+pipeline outputs, resulting in one of three outcomes: a clear
+preference for one response, a tie (both equally good), or
+neither (both inadequate).
+We compute Elo ratings using pairwise comparisons. The
+Elo score, invented in the context of chess for ranking players
+based on 1-to-1 matches [14], has recently become a popular metric for comparing LLMs (e.g., by Chiang et al. [10]).
+We use the Bradley-Terry model to compute Elo scores
+from these pairwise outcomes, treating ties as half a win for
+each model (the standard convention). We also report wins
+rate: WinsRate = Wins+0.5×Ties
+TotalGames . Elo rankings are in Table 3,
+whereas the full pairwise results are in Figure 3 and Table 9.
+Figure 3 shows that, as expected, vanilla (unsecured) RAG
+has the largest number of wins when discarding ties. However,
+
+7.2
+
+Correctness, relevance, and quality
+
+We now evaluate the pipelines independently via the use of
+three LLM-as-Judges, which independently evaluate correctness, relevance, and quality (as detailed in Table 2).
+Figure 4 reports summary statistics on the number of
+times each pipeline received the highest rating out of all the
+pipelines (including tied highest). We observe that, whereas
+the pipelines are very similar in terms of relevance and quality
+of the responses, there are notable differences in correctness.
+On RepliQA, the LLM-based highlighters (H&S Structured and H&S Two Steps) achieve the highest correctness
+scores, with vanilla RAG close behind. The BERT-based extractors show notably lower correctness, with the SQuAD2trained model performing worst; this is likely because it was
+8
+
+not trained on this domain. On BioASQ, a similar pattern
+emerges: H&S Two Steps and H&S Structured lead on correctness, while H&S Span underperforms.
+These results suggest that the correctness metric is the most
+discriminative, while relevance and quality judges show little
+differentiation between pipelines. The strong performance of
+LLM-based highlighters on correctness indicates that accurate span selection is crucial for answer quality, whereas the
+extractive BERT approaches—particularly when applied outof-domain—struggle to identify the most relevant passages.
+Figure 5 shows the distribution of ratings from each judge.
+We discuss each judge separately.
+Correctness. Poll Multihop Correctness evaluates the correctness of a generated answer against the reference answer (binary: True/False). On RepliQA, the LLM-based highlighters (H&S Structured and H&S Two Steps) achieve the
+highest correctness, with over 13,400 correct answers out of
+approximately 14,200 answerable questions. We observe that
+H&S DeBERTaV3 (SQuAD2) performs poorly on RepliQA,
+achieving only 5,921 correct answers—likely due to its base
+highlighter being fine-tuned for returning short answers rather
+than extracting relevant passages. In contrast, the same base
+model fine-tuned on a separate split of RepliQA achieves
+8,676 correct answers, suggesting that fine-tuning on indomain data substantially improves extractive QA performance. On BioASQ, H&S Two Steps leads (27,092), while
+H&S Span underperforms (21,442). Notably, the RepliQAtuned DeBERTaV3 performs worse on BioASQ than the
+SQuAD2-tuned variant, reinforcing that data distribution highly
+impacts performance and that more varied fine-tuning datasets
+should be used in practice.
+
+Figure 3: Wins of each pipeline in the direct pairwise comparison by the ComparisonJudge. Ties are omitted.
+
+Relevance. The Reliable CI Relevance metric captures how
+relevant an answer is to a question on a 0–3 scale. We observe minimal differentiation across pipelines: all methods
+achieve near-perfect relevance, with the vast majority of answers receiving a score of 3. On RepliQA, Vanilla RAG and
+H&S Baseline show marginally higher counts at the top rating,
+while on BioASQ, H&S Span edges slightly ahead. However,
+these differences are negligible in practice.
+Response quality. MTBench Chat Bot Response Quality
+evaluates responses on a 1–10 scale. We observe that ratings
+cluster around 5–6 for both datasets, with minimal variation
+across pipelines. H&S Baseline and Vanilla RAG achieve
+marginally higher quality scores, while the BERT-based extractors lag slightly behind. Based on manual inspection of
+the judge’s explanations, we observe that the judge tends to
+demand additional information beyond what is available in the
+retrieved document. This suggests the judge is better suited
+for rating LLMs on open-ended questions without source
+
+Figure 4: Number of times each pipeline had the highest
+rating, including ties, according to LLM-as-Judges.
+
+9
+
+Figure 5: Response’s evaluation via LLM-as-Judges on the two datasets, measuring: correctness, relevance, and quality.
+documents, rather than in RAG settings where answers are
+necessarily constrained by the retrieved context.
+
+H&S DeBERTaV3 (RepliQA)
+H&S Structured Highlighter
+H&S Span Highlighter
+H&S DeBERTaV3 (SQuAD2)
+Vanilla RAG
+H&S Baseline
+H&S Two Steps Highlighter
+
+K-Precision
+
+Recall
+
+RepliQA
+
+K-Precision and Recall
+
+Vanilla RAG
+H&S Structured Highlighter
+H&S Span Highlighter
+H&S Baseline
+H&S Two Steps Highlighter
+H&S DeBERTaV3 (RepliQA)
+H&S DeBERTaV3 (SQuAD2)
+
+0.76
+0.70
+0.69
+0.69
+0.69
+0.63
+0.44
+
+0.78
+0.65
+0.64
+0.63
+0.64
+0.39
+0.22
+
+BioASQ
+
+7.3
+
+Pipeline
+
+Pipeline
+
+Vanilla RAG
+H&S Baseline
+H&S Structured Highlighter
+H&S Two Steps Highlighter
+H&S DeBERTaV3 (RepliQA)
+H&S DeBERTaV3 (SQuAD2)
+H&S Span Highlighter
+
+0.55
+0.37
+0.37
+0.35
+0.27
+0.22
+0.19
+
+0.44
+0.42
+0.44
+0.44
+0.22
+0.16
+0.18
+
+Precision
+
+Recall
+
+F1
+
+0.85
+0.94
+0.76
+0.55
+0.94
+0.60
+0.45
+
+0.99
+0.40
+0.43
+0.48
+0.24
+0.20
+0.01
+
+0.91
+0.57
+0.55
+0.51
+0.38
+0.30
+0.03
+
+Table 5: Precision and Recall for declined answers.
+
+reproduce passage content more verbatim. In contrast, H&S
+pipelines produce answers that paraphrase or restructure the
+source material. The recall metrics show smaller gaps, suggesting that H&S pipelines still capture the essential information from reference answers despite lower lexical overlap.
+A notable discrepancy emerges when comparing these
+token-overlap metrics with LLM judge evaluations (Figure 4
+and Figure 5. This discrepancy reflects a fundamental distinction between lexical similarity and semantic correctness.
+K-precision rewards verbatim quotes from the source passage,
+which inflates scores for systems that extract and reproduce
+text directly. However, a correct answer does not need to share
+exact tokens with the reference: paraphrased responses that
+accurately convey the same information are equally valid.
+
+Table 4: K-precision and recall of the predicted answers
+against the reference passage and answer.
+Table 4 presents K-precision and recall metrics for all
+pipelines across both datasets. Vanilla RAG consistently
+achieves the highest K-precision scores (0.76 on RepliQA,
+0.51 on BioASQ), outperforming all H&S variants by 6–10
+percentage points. K-precision measures the proportion of
+tokens in the predicted answer that appear in the reference
+passage, and these results suggest that Vanilla RAG tends to
+
+7.4
+
+Decline to answer
+
+Around 10% of questions in the RepliQA dataset cannot be
+answered based on the provided document. We evaluate how
+well the various pipelines declined to answer these questions.
+In Table 5, we report K-Precision and Recall for each
+10
+
+Figure 6: Effect of min_words enforcement on the text extracts. It shows what percentage of text extracts satisfies the
+security property, for various levels of min_words. Results
+on the RepliQA dataset.
+
+Figure 7: Do we need H&S, or can we just do highlighting
+(e.g., extractive QA)? The preference is based on an LLMbased ComparisonJudge that looks specifically at the relevance and correctness of a response.
+
+pipeline in terms of declining to answer. We observe that
+DeBERTaV3-based models fare well, which is possibly due
+to the fact that their fine-tuning considers the no-answer case
+explicitly. The H&S DeBERTaV3 (RepliQA) performs particularly well; this may be partially due to the fact that it
+was trained on data with a similar distribution as the test set.
+H&S Structured also does relatively well, possibly because
+the structured output option helps its reflection process.
+Nevertheless, the absolute performance of all the pipelines
+suggests there is still significant potential for improvement
+in this aspect. This connects to the open problem of teaching LLMs to say “I don’t know” [20, 23, 25] Future H&S
+implementations should consider either better fine-tuning or
+few-shot prompt-tuning to improve on this aspect.
+
+8.1
+
+7.5
+
+First, one may wonder whether we actually need the summarizer in the pipeline. Given the long history of passage
+retrieval and extractive QA, a simpler highlighter, which can
+be implemented on the basis of an extractive QA model, may
+perform well in QA tasks.
+To answer this question, we compare the outputs of the
+individual highlighters against the response given by the full
+H&S pipeline using a ComparisonJudge. To avoid longer
+answers from being judged more favorably, we truncate the
+responses to 40 words; this is roughly 2 English sentences,
+which is what the H&S pipeline is prompted to produce. We
+run this experiment for the Two Steps pipeline.
+As shown in Figure 7, our results indicate that using a generative LLM (summarizer) after the highlighting step can lead
+to substantial improvements. This is particularly evident on
+the BioASQ dataset, where the H&S outputs were preferred
+in 67% of cases versus only 2% for the highlighter alone.
+Based on a qualitative manual inspection of the ComparisonJudge’s explanations accompanying its ratings, we observe
+that the H&S pipeline is typically preferred for its more “relevant” answers that “directly address” a question, whereas the
+highlighter is preferred for its “direct quotes”.
+
+Effect of min_words
+
+We measure the effect of enforcing the min_words security
+parameters on the text extracts from the various highlighter
+methods. Figure 6 shows that pipelines are only minimally
+affected by this: the worst affected for min_words = 10, a
+relatively large value for the security parameter, is the H&S
+baseline with 99.0% ± 8.4 loss of extracted texts.
+
+8
+
+Do we need a generative summarizer?
+
+8.2
+
+Ablation study of H&S components
+
+How good are the highlighters?
+
+We now compare the various highlighter implementations in
+terms of their K-Precision and Recall with respect to the gold
+passage. Since this analysis requires a gold passage, we are
+only able to use the RepliQA dataset.
+As shown in Table 6, we observe that LLM-based highlighters significantly outperform those based on DeBERTaV3,
+especially in terms of Recall. However, as discussed in section 7, LLM-based highlighters incur higher computational
+overheads, which may be a consideration in practical applications. We did not focus on optimizing the performance
+of the DeBERTaV3 models, and we hypothesize that there
+
+In this section we evaluate the individual components of an
+H&S pipeline, to provide deeper insights into why this approach can achieve the results presented above. First, we
+explore whether H&S is needed at all, or whether a simple
+passage retrieval or extraction QA pipeline (i.e., highlighter
+without the summarizer) may suffice. Next, we compare our
+different highlighter implementations in terms of their KPrecision and Recall. Finally, we investigate whether the summarizer can recreate the original question based solely on the
+outputs of a highlighter.
+11
+
+Implementation
+H&S Baseline
+H&S Span Highlighter
+H&S Structured Highlighter
+H&S Two Steps Highlighter
+H&S DeBERTaV3 (RepliQA)
+H&S DeBERTaV3 (SQuAD2)
+
+K-Precision
+
+Recall
+
+0.85
+0.84
+0.84
+0.82
+0.80
+0.55
+
+0.66
+0.73
+0.76
+0.77
+0.36
+0.22
+
+“In his later years, Kant lived a strictly ordered life. It was said
+that neighbors would set their clocks by his daily walks”.10
+This text could plausibly answer several realistic questions,
+including “Was Immanuel Kant a creature of habit?”, “What
+philosopher is best known for their punctuality?”, or “Did
+Kant enjoy walking?”. Importantly, the passage would be a
+valid answer to all those questions, implying that knowing
+the exact question is not strictly necessary to answer.
+
+DeBERTaV3 (RepliQA)
+Baseline
+Structured Highlighter
+Span Highlighter
+Two Steps Highlighter
+DeBERTaV3 (SQuAD2)
+
+0.55
+0.55
+0.54
+0.53
+0.52
+0.37
+
+0.50
+0.56
+0.57
+0.55
+0.57
+0.38
+
+Span Highlighter
+Structured Highlighter
+Two Steps Highlighter
+Baseline
+DeBERTaV3 (RepliQA)
+DeBERTaV3 (SQuAD2)
+
+0.70
+0.69
+0.69
+0.68
+0.58
+0.45
+
+0.46
+0.47
+0.47
+0.45
+0.35
+0.26
+
+Table 7: Can the summarizer guess the user’s question? The
+summarizer guesses up to 10 questions, and we report the
+precision and recall for the best one of them.
+
+may still be scope for further improvement. An encouraging result in this direction is that fine-tuning DeBERTaV3
+for the specific task of long-context highlighting (RepliQA
+dataset) improves performance compared to the same model
+fine-tuned on SQuAD2 (short answers). Results in Table 6 also
+indicate that using structured outputs for LLM-based highlighters improves performance (Recall). However, as reported
+in section 7, this incurs additional computational costs.
+We further evaluate highlighters on a stricter metric: we
+count how many times the highlighter’s output is either an
+exact match, a substring, or a superstring of the gold passage
+(although one should bear in mind that the span of the humanchosen gold passage is somewhat arbitrary). Figure 8 shows
+that, in this case, the DeBERTaV3 highlighter that was finetuned on RepliQA has the best performance. We attribute this
+to the fact that, even if its fine-tuning was done on a separate
+split of the RepliQA dataset, the model may have captured
+the style of gold passage selection of the human annotators
+for RepliQA.
+
+8.3
+
+Recall
+
+RepliQA
+
+Pipeline
+
+Figure 8: Comparison of the highlighter’s output text to the
+human-curated gold passage in the RepliQA dataset.
+
+K-Precision
+
+BioASQ
+
+Table 6: Comparison between highlighter implementations
+with respect to the gold passage (RepliQA dataset.)
+
+When implementing the summarizer (section 4), we ask the
+LLM to output multiple guessed_questions, a field that is
+not used by the H&S pipeline, but which helps with grounding
+the model. Table 7 shows the K-Precision and Recall of the
+best among the guessed_questions with respect to the true
+question. As expected, the summarizer is rarely able to guess
+the question correctly. However, its average performance is
+far from insignificant, with better pipelines achieving higher
+scores. In Table 10, we report some of the best and worst
+examples that highlight the ill-posedness of the problem.
+These results confirm our intuition: it is hard to infer the
+question given just some highlighted context. However, this
+also shows that guessing the right question is not necessary
+to answer a question, as evidenced by the great performance
+of our H&S pipelines section 7.
+
+9
+
+Discussion and future directions
+
+This study of a new design pattern opens up a large number
+of research questions and directions to explore. We discuss
+some of the challenges that we leave open for future work.
+
+Can the summarizer guess the question?
+
+To gain a deeper understanding of the internal workings of
+an H&S pipeline, we investigate whether the summarizer can
+guess the user’s original question, based solely on the text provided by the highlighter. We start by noting that this problem
+is, by its nature, ill-posed. For example, consider the passage
+
+Automated checking for adversarial inputs in the knowledge base. Our threat model assumes a trustworthy knowl10 https://en.wikipedia.org/wiki/Immanuel_Kant.
+
+12
+
+work can investigate whether this approach improves answers
+for this class of questions.
+Handling multiple questions. In some cases, the user may
+ask more than one question in the same prompt. It may be
+possible to handle this via system design. For example, the
+highlighter can first split the questions that are present in the
+prompt, and then have the H&S system make separate calls
+to the summarizer. Future work can investigate this design or
+other solutions to the problem.
+Reasoning. We remark that a class of QA tasks that H&S
+does not support in its current stage is reasoning-based ones.
+For example, it may be unable to answer questions such as
+“Calculate the total number of holidays between annual leave
+and national holidays”: in this case, the H&S pipeline will
+presumably report quotes from both data sources (annual
+leave policy and national holidays), but it will be unable to
+compute their sum, as it cannot be aware that is the intent of
+the user. We expect future research can hope to extend the
+applicability of H&S to a wider set of tasks. Nevertheless, we
+remark that H&S is readily useful for answering matter of
+factual questions based on documents, such as policies legal
+papers, or FAQ-style knowledge bases.
+
+Figure 9: Weak correlation between the ability of the summarizer to guess the question and the performance of H&S
+Structured. Pearson correlation: 0.04 (p-value = 7 × 10−7 )).
+
+edge base. While this is realistic in many real-world use cases
+(e.g., QA based on FAQs), it may not be the case in all RAG
+applications. Interestingly, H&S makes it significantly easier to look for threats even in those cases: it (exponentially)
+reduces the scope of the problem from inspecting both the
+knowledge base and the very large space of possible user inputs, down to inspecting only the knowledge base. The system
+designer can scan their knowledge base for potential triggers,
+by inspecting each document via a (sequential) sliding window based of what the highlighter is allowed to highlight.
+Future work can investigate efficient scanning techniques.
+
+Does H&S reduce hallucinations? Intuitively, H&S should
+reduce hallucinations compared to standard RAG pipelines by
+sticking strictly to the documents retrieved from the knowledge base. However, it is still possible that either the highlighter or summarizer could suffer from hallucinations. For
+example, as discussed in section 7, when faced with an unanswerable question, the highlighter sometimes highlighted sections that are either irrelevant or misleading. Furthermore, the
+summarizer may suffer from hallucinations in its generative
+step, as usual. Future work can investigate whether H&S, or
+some variant thereof, can help to reduce hallucinations.
+
+Additional signals to the summarizer. Future work can
+study what additional information about the question can be
+passed from the highlighter to the summarizer without increasing the risk of attacks. For example, the H&S pipeline
+could monitor the similarity between the user’s question
+and the question guessed by the summarizer. If there is too
+much divergence, the system could be programmed to refuse
+to answer, or to adapt the answer accordingly. In preliminary experiments, we found a weak correlation between the
+pipeline’s performance and the summarizer’s ability to predict the question: Figure 9 shows the relationship between
+the full pipeline’s performance and the K-Precision of the
+summarizer at guessing the question.
+
+10
+
+Conclusion
+
+We propose Highlight&Summarize (H&S), a design pattern
+that enhances the generative step of a RAG pipeline to provide
+security by design against jailbreaking and model hijacking
+attacks. We evaluate its security theoretically and empirically,
+against non-adaptive and adaptive adversaries. Our empirical evaluations demonstrate that, compared to current RAG
+pipelines, our approach actually improves the accuracy of responses in certain scenarios. Overall, H&S provides strong
+security while enabling high-performing RAG-style chatbots.
+We also discuss several new research questions that arise from
+this design pattern, and encourage their study as exciting avenues for future research.
+
+Handling Yes/No questions For some questions, a simple
+“Yes” or “No” can be a satisfactory answer. We observe that
+H&S can be easily augmented to support such questions,
+whilst ensuring the same level of security. For example, the
+highlighter can optionally pass a tag to the summarizer indicating: i) whether the question being asked is of yes-no type,
+and if so ii) what it thinks to be the answer (yes/no). Since
+both of these fields are of boolean type, they are unlikely to
+introduce any new security risk. The summarizer can then be
+instructed to augment its answer with this information. 
