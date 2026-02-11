@@ -1,2 +1,2 @@
-reproduce/results/**/*.csv filter=lfs diff=lfs merge=lfs -text
 reproduce/results/**/*.jsonl filter=lfs diff=lfs merge=lfs -text
+reproduce/results/**/*.parquet filter=lfs diff=lfs merge=lfs -text

@@ -1,8 +1,10 @@
-"""Convert HuggingFace Dataset results to CSV, stripping HF dataset columns.
+"""Convert HuggingFace Dataset results to Parquet, stripping HF dataset columns.
 The merge key (question_id for repliqa, id for bioasq) is preserved for later re-merging.
+
+Parquet preserves Python types (lists, arrays) natively.
 """
 import os
-from run_experiments import load_all_results
+from utils import load_all_results
 
 RESULTS_DIR = "results/"
 
@@ -22,4 +24,4 @@ for dataset_name, dataset_results in results.items():
     hf_cols = HF_COLUMNS.get("repliqa" if "repliqa" in dataset_name else "bioasq", [])
     df = df.drop(columns=[c for c in hf_cols if c in df.columns])
     
-    df.to_csv(os.path.join(RESULTS_DIR, dataset_name, f"{dataset_name}_results_processed.csv"), index=False)
+    df.to_parquet(os.path.join(RESULTS_DIR, dataset_name, f"{dataset_name}_results_processed.parquet"), index=False)
