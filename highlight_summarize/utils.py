@@ -118,7 +118,11 @@ def poll_batch(batch_job_id: str) -> str | None:
         status = batch_job.status
         elapsed = int(time.time() - start_time)
         mins, secs = divmod(elapsed, 60)
-        print(f"\rBatch {batch_job_id} status: {status} [{mins:02d}:{secs:02d}]", end="", flush=True)
+        print(
+            f"\rBatch {batch_job_id} status: {status} [{mins:02d}:{secs:02d}]",
+            end="",
+            flush=True,
+        )
 
         if status == "completed":
             print()  # Move to new line

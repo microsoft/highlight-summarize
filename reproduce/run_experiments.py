@@ -16,7 +16,6 @@ from highlight_summarize.hs import (
     HSTwoStepsHighlighter,
 )
 
-
 PIPELINE_MAP = {
     "QAEvaluator": QAEvaluator,
     "HSBaseline": HSBaseline,

@@ -197,7 +197,7 @@ class HSBaseline(QAEvaluator):
                     "content": self.summarizer_prompt.format(
                         text_extract=text_extract,
                     ),
-                }
+                },
             ],
             temperature=self.temperature,
             model_name=self.summarizer_model_name,

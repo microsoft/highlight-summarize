@@ -91,7 +91,9 @@ def mt_map(
                     dataset_dict[ex_id].update(res)
                 pbar.update(1)
         else:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_threads) as executor:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=max_threads
+            ) as executor:
                 # Start the load operations and mark each future with its example id.
                 future_to_example = {
                     executor.submit(
