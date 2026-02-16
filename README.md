@@ -52,7 +52,7 @@ To reproduce the experiments, head over to [reproduce](reproduce/).
 
 ## Lean 4 proofs
 
-To check out the proofs of our theory section.
+To check out the proofs of our theory section go to [proofs](proofs/).
 
 --------------------
 
