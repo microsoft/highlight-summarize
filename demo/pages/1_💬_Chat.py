@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 from utils import sidebar, load_content, log
 from highlight_summarize.hs import HSStructuredHighlighter, HSBaselinePrediction
+from highlight_summarize.utils import NOANSWER_PRED, FAILED_PRED
 
 #################################
 # H&S and data.
@@ -16,7 +17,7 @@ hs = HSStructuredHighlighter(
 
 # "RAG" document.
 doc = load_content("highlight_summarize.txt").strip()
-if not doc.strip:
+if not doc.strip():
     raise ValueError("The document is empty. Please provide a valid document.")
 detective = load_content("detective.png", mode="rb")
 
@@ -47,9 +48,10 @@ class Msg(BaseModel):
             raise ValueError("No full response to display.")
         md = "Psst! Here's what is happening inside H&S:\n\n"
         texts = "\n".join(self.full_response.highlighter_text_extracts) if self.full_response.highlighter_text_extracts else None
+        guessed_qs = ", ".join(self.full_response.summarizer_llm_guessed_questions) if self.full_response.summarizer_llm_guessed_questions else None
         lines = [
             f"**Highlighter Output:** {texts}.",
-            f"**What question the summarizer thinks was asked:** {self.full_response.summarizer_llm_guessed_question}.",
+            f"**What question(s) the summarizer thinks were asked:** {guessed_qs}.",
             f"**Summarizer response:** {self.full_response.answer_pred}."
         ]
         for line in lines:
@@ -80,8 +82,10 @@ if prompt := st.chat_input():
     )
 
     # Handle the response.
-    if not response.answer_pred or response.answer_pred == "UNANSWERABLE":
+    if not response.answer_pred or response.answer_pred == NOANSWER_PRED:
         answer = "I don't know the answer to that question. I can only answer based on my knowledge about H&S."
+    elif response.answer_pred == FAILED_PRED:
+        answer = "Sorry, something went wrong while processing your question."
     else:
         answer = response.answer_pred
     msg = Msg(role="assistant", content=answer, full_response=response)
