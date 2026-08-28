@@ -89,7 +89,7 @@ def patched_get_completion(
     response_format: dict | None = None,
     response_model=None,
 ):
-    """Monkey-patch the get_completion method to use the openai_client."""
+    """Monkey-patch the get_completion method to use the shared client."""
     if response_model is not None:
         raise ValueError(
             "response_model is not supported in this context. Use response_format instead."

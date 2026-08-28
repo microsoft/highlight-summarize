@@ -35,6 +35,8 @@ from highlight_summarize.comparison_judge import (
 )
 from highlight_summarize.utils import run_batch
 
+PAIRWISE_COMPARISON_WORKERS = int(os.getenv("PAIRWISE_COMPARISON_WORKERS", "8"))
+
 
 def get_run_info(run_folder):
     """Extracts the base folder, dataset name and pipeline from the run folder."""
@@ -288,10 +290,11 @@ def pairwise_comparisons(folder, pipelines, model_name):
                 model_name=model_name,
             )
         except Exception as e:
-            print(f"Error in pairwise comparison: {e}")
+            print(f"Error comparing {pipeline_1} vs {pipeline_2}: {e}")
 
-    with ThreadPoolExecutor() as executor:
-        list(executor.map(compare, combinations(pipelines, 2)))
+    with ThreadPoolExecutor(max_workers=PAIRWISE_COMPARISON_WORKERS) as executor:
+        for _ in executor.map(compare, combinations(pipelines, 2)):
+            pass
 
 
 if __name__ == "__main__":
