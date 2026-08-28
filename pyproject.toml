@@ -16,7 +16,7 @@ dependencies = [
     "azure-identity==1.23.0",
     "datasets==3.6.0",
     "docopt==0.6.2",
-    "python-dotenv==1.0.0",  # Fixed package name
+    "python-dotenv==1.2.2",  # Fixed package name
     "evaluate==0.4.3",
     "fschat==0.2.36",
     "judges==0.0.12",
