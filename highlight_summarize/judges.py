@@ -18,7 +18,7 @@ class LLMJudge:
         judge_name,
         correct=10,
         incorrect=1,
-        factors=[],
+        factors=None,
     ):
         """Initialize the judge with a name, correctness ratings, and factors.
 
@@ -31,7 +31,7 @@ class LLMJudge:
         self.judge_name = judge_name
         self.correct = correct
         self.incorrect = incorrect
-        self.factors = factors
+        self.factors = factors if factors is not None else []
 
     def _format_response(
         self, responses: dict[str, LLMJudgeResponse]
@@ -64,8 +64,8 @@ class LLMJudge:
         # Call judge.
         judgement = self.call_judge(
             input=example["question"],
-            output=example["answer"],
-            expected=example["answer_pred"],
+            output=example["answer_pred"],
+            expected=example["answer"],
         )
 
         return self._format_response(judgement)
