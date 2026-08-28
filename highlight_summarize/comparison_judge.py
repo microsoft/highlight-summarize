@@ -32,7 +32,10 @@ class ComparisonJudge:
             """Please act as an impartial judge and evaluate the quality of two responses provided
             to the user question displayed below. Your evaluation must consider
             the factual correctness of the response to the question and the relevance of the response
-            as an answer to the question.
+            as an answer to the question. Use the Reference Answer as the factual ground truth.
+            Responses may use different wording or include relevant detail, but must not contradict the Reference Answer.
+            If the Reference Answer is "UNANSWERABLE", a response that provides an answer is incorrect;
+            prefer a response that appropriately declines to answer.
             Do NOT prefer longer or more detailed answers: relevance and correctness are the only criteria.
             Begin your evaluation by providing a short explanation. Be as objective as
             possible. After providing your explanation, select the response that you think is better.
@@ -40,6 +43,8 @@ class ComparisonJudge:
             select "neither".
             [Question]
             {input}
+            [Reference Answer]
+            {expected}
             [Response 1]
             {output_1}
             [Response 2]
@@ -49,11 +54,14 @@ class ComparisonJudge:
         )
 
     def _format_messages(
-        self, question: str, output_1: str, output_2: str
+        self, question: str, output_1: str, output_2: str, expected: str
     ) -> list[dict[str, str]]:
         """Format the messages for the judge."""
         formatted_prompt = self.prompt.format(
-            input=question, output_1=output_1, output_2=output_2
+            input=question,
+            output_1=output_1,
+            output_2=output_2,
+            expected=expected,
         )
         return [
             {"role": "system", "content": "You are an impartial judge."},
@@ -66,6 +74,7 @@ class ComparisonJudge:
         question: str,
         output_1: str,
         output_2: str,
+        expected: str,
     ) -> tuple[dict[str, Any], bool]:
         """
         Create a batch request for comparing two outputs.
@@ -79,7 +88,7 @@ class ComparisonJudge:
         if inverted:
             output_1, output_2 = output_2, output_1
 
-        messages = self._format_messages(question, output_1, output_2)
+        messages = self._format_messages(question, output_1, output_2, expected)
 
         # Encode inversion flag in custom_id: "{original_id}:{0|1}"
         encoded_id = f"{custom_id}:{1 if inverted else 0}"
@@ -120,25 +129,19 @@ class ComparisonJudge:
 
         return original_id, parsed
 
-    def __call__(self, question: str, output_1: str, output_2: str) -> JudgeResponse:
+    def __call__(
+        self, question: str, output_1: str, output_2: str, expected: str
+    ) -> JudgeResponse:
         """Evaluate two responses to a question."""
         # Invert the answers at random.
         if random.random() > 0.5:
             inverted = False
-            formatted_prompt = self.prompt.format(
-                input=question, output_1=output_1, output_2=output_2
-            )
         else:
-            formatted_prompt = self.prompt.format(
-                input=question, output_1=output_2, output_2=output_1
-            )
+            output_1, output_2 = output_2, output_1
             inverted = True
 
         model_response = query_llm(
-            messages=[
-                {"role": "system", "content": "You are an impartial judge."},
-                {"role": "user", "content": formatted_prompt},
-            ],
+            messages=self._format_messages(question, output_1, output_2, expected),
             temperature=self.temperature,
             model_name=self.model_name,
             response_format=JudgeResponse,

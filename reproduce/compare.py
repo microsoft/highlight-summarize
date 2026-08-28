@@ -34,7 +34,7 @@ from highlight_summarize.comparison_judge import (
     ResponseChoice,
     JudgeResponse,
 )
-from highlight_summarize.utils import run_batch
+from highlight_summarize.utils import NOANSWER_PRED, run_batch
 
 
 def get_run_info(run_folder):
@@ -112,6 +112,7 @@ def pairwise_comparison(run_folder_1, run_folder_2, model_name="gpt-4.1-mini"):
     judge = ComparisonJudge(model_name=model_name)
     batch_requests = []
     metadata = []  # Store metadata for each comparison
+    results_by_id = {}
 
     for idx, (example1, example2) in enumerate(zip(dataset_1, dataset_2)):
         question = example1["question"]
@@ -121,16 +122,30 @@ def pairwise_comparison(run_folder_1, run_folder_2, model_name="gpt-4.1-mini"):
             )
             continue
 
+        expected = example1["answer"]
+        if expected != example2["answer"]:
+            raise ValueError(f"Reference answers do not match at index {idx}.")
+
         output_1 = example1["answer_pred"]
         output_2 = example2["answer_pred"]
 
-        request, _ = judge.create_batch_request(
-            custom_id=str(idx),
-            question=question,
-            output_1=output_1,
-            output_2=output_2,
-        )
-        batch_requests.append(request)
+        # We only take a shortcut (early return) iff both are exactly NOANSWER_PRED;
+        # otherwise, we would unfairly judge cases where one of the two "won't answer"
+        # answers are slightly different from the verbatim NOANSWER_PRED.
+        if expected == output_1 == output_2 == NOANSWER_PRED:
+            results_by_id[str(idx)] = JudgeResponse(
+                preference=ResponseChoice.tie,
+                explanation="Both responses correctly decline to answer.",
+            )
+        else:
+            request, _ = judge.create_batch_request(
+                custom_id=str(idx),
+                question=question,
+                output_1=output_1,
+                output_2=output_2,
+                expected=expected,
+            )
+            batch_requests.append(request)
         metadata.append(
             {
                 "idx": idx,
@@ -140,7 +155,7 @@ def pairwise_comparison(run_folder_1, run_folder_2, model_name="gpt-4.1-mini"):
             }
         )
 
-    if not batch_requests:
+    if not metadata:
         print("No valid comparisons to process.")
         return
 
@@ -148,11 +163,12 @@ def pairwise_comparison(run_folder_1, run_folder_2, model_name="gpt-4.1-mini"):
     batch_file = os.path.join(
         base_folder_1, dataset_name_1, f"batch-{pipeline_1}_vs_{pipeline_2}.jsonl"
     )
-    print(f"Submitting batch with {len(batch_requests)} comparisons...")
-    results = run_batch(batch_requests, batch_file)
+    results = []
+    if batch_requests:
+        print(f"Submitting batch with {len(batch_requests)} comparisons...")
+        results = run_batch(batch_requests, batch_file)
 
     # Parse results and build output
-    results_by_id = {}
     for result in results:
         original_id, judge_response = ComparisonJudge.parse_batch_response(result)
         results_by_id[original_id] = judge_response
@@ -203,9 +219,11 @@ def highlighter_comparison(run_folder, model_name="gpt-4.1-mini", limit_words=40
     judge = ComparisonJudge(model_name=model_name)
     batch_requests = []
     metadata = []
+    results_by_id = {}
 
     for idx, example in enumerate(dataset):
         question = example["question"]
+        expected = example["answer"]
         hs_output = example["answer_pred"]
         highlighter_output = example["highlighter_extracted"]
 
@@ -221,13 +239,21 @@ def highlighter_comparison(run_folder, model_name="gpt-4.1-mini", limit_words=40
         hs_output = truncate(hs_output, limit_words)
         highlighter_output = truncate(highlighter_output, limit_words)
 
-        request, _ = judge.create_batch_request(
-            custom_id=str(idx),
-            question=question,
-            output_1=hs_output,
-            output_2=highlighter_output,
-        )
-        batch_requests.append(request)
+        # Only shortcut exact sentinel agreement; other wording may still be a valid abstention.
+        if expected == hs_output == highlighter_output == NOANSWER_PRED:
+            results_by_id[str(idx)] = JudgeResponse(
+                preference=ResponseChoice.tie,
+                explanation="Both responses correctly decline to answer.",
+            )
+        else:
+            request, _ = judge.create_batch_request(
+                custom_id=str(idx),
+                question=question,
+                output_1=hs_output,
+                output_2=highlighter_output,
+                expected=expected,
+            )
+            batch_requests.append(request)
         metadata.append(
             {
                 "idx": idx,
@@ -237,7 +263,7 @@ def highlighter_comparison(run_folder, model_name="gpt-4.1-mini", limit_words=40
             }
         )
 
-    if not batch_requests:
+    if not metadata:
         print("No valid comparisons to process.")
         return
 
@@ -245,11 +271,12 @@ def highlighter_comparison(run_folder, model_name="gpt-4.1-mini", limit_words=40
     batch_file = os.path.join(
         base_folder, dataset_name, f"batch-{pipeline}-highlighter_vs_hs.jsonl"
     )
-    print(f"Submitting batch with {len(batch_requests)} comparisons...")
-    results = run_batch(batch_requests, batch_file)
+    results = []
+    if batch_requests:
+        print(f"Submitting batch with {len(batch_requests)} comparisons...")
+        results = run_batch(batch_requests, batch_file)
 
     # Parse results and build output
-    results_by_id = {}
     for result in results:
         original_id, judge_response = ComparisonJudge.parse_batch_response(result)
         results_by_id[original_id] = judge_response
