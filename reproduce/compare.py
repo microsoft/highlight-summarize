@@ -21,6 +21,9 @@ e.g. `results/repliqa_3`.
 """
 
 import os
+from concurrent.futures import ThreadPoolExecutor
+from itertools import combinations
+
 import datasets
 import pandas as pd
 from docopt import docopt
@@ -274,6 +277,23 @@ def highlighter_comparison(run_folder, model_name="gpt-4.1-mini", limit_words=40
     pd.DataFrame(compared).to_json(output_fname, lines=True, orient="records")
 
 
+def pairwise_comparisons(folder, pipelines, model_name):
+    def compare(pipeline_pair):
+        pipeline_1, pipeline_2 = pipeline_pair
+        print(f"\n--- Comparing {pipeline_1} vs {pipeline_2} ---")
+        try:
+            pairwise_comparison(
+                os.path.join(folder, pipeline_1),
+                os.path.join(folder, pipeline_2),
+                model_name=model_name,
+            )
+        except Exception as e:
+            print(f"Error in pairwise comparison: {e}")
+
+    with ThreadPoolExecutor() as executor:
+        list(executor.map(compare, combinations(pipelines, 2)))
+
+
 if __name__ == "__main__":
     args = docopt(__doc__)
     model_name = args["--model"]
@@ -291,19 +311,7 @@ if __name__ == "__main__":
             )
 
         print(f"Found {len(pipelines)} pipelines in folder '{folder}'.")
-
-        # Process pipeline pairs sequentially (batch API handles parallelism)
-        for i in range(len(pipelines)):
-            for j in range(i + 1, len(pipelines)):
-                run_folder_1 = os.path.join(folder, pipelines[i])
-                run_folder_2 = os.path.join(folder, pipelines[j])
-                print(f"\n--- Comparing {pipelines[i]} vs {pipelines[j]} ---")
-                try:
-                    pairwise_comparison(
-                        run_folder_1, run_folder_2, model_name=model_name
-                    )
-                except Exception as e:
-                    print(f"Error in pairwise comparison: {e}")
+        pairwise_comparisons(folder, pipelines, model_name)
 
     elif args["highlighter"]:
         run_folder = args["<run_folder>"]

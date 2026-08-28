@@ -2,7 +2,7 @@ import judges as judges_lib
 from typing import Any
 from pydantic import BaseModel
 
-from .utils import NOANSWER_PRED, query_llm, openai_client
+from .utils import NOANSWER_PRED, query_llm, client
 
 
 class LLMJudgeResponse(BaseModel):
@@ -95,7 +95,7 @@ def patched_get_completion(
             "response_model is not supported in this context. Use response_format instead."
         )
 
-    return openai_client().beta.chat.completions.parse(
+    return client.beta.chat.completions.parse(
         model=model,
         messages=messages,  # type: ignore
         temperature=temperature,
