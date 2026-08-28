@@ -6,10 +6,11 @@ for all pipelines.
 
 Usage:
     compare.py highlighter <run_folder> [--model=<model>]
-    compare.py pairwise <results_for_dataset_folder> [--model=<model>]
+    compare.py pairwise <results_for_dataset_folder> [--model=<model>] [--workers=<workers>]
 
 Options:
-    --model=<model>  Model name for the judge [default: gpt-4.1-mini-batch]
+    --model=<model>      Model name for the judge [default: gpt-4.1-mini-batch]
+    --workers=<workers>  Concurrent pairwise comparisons [default: 8]
 
 A `run_folder` is produced by `run_experiments.py` and it looks something like:
 `results/repliqa_3/HSBaseline-gpt-4.1-mini-gpt-4.1-mini`
@@ -34,8 +35,6 @@ from highlight_summarize.comparison_judge import (
     JudgeResponse,
 )
 from highlight_summarize.utils import run_batch
-
-PAIRWISE_COMPARISON_WORKERS = int(os.getenv("PAIRWISE_COMPARISON_WORKERS", "8"))
 
 
 def get_run_info(run_folder):
@@ -279,7 +278,7 @@ def highlighter_comparison(run_folder, model_name="gpt-4.1-mini", limit_words=40
     pd.DataFrame(compared).to_json(output_fname, lines=True, orient="records")
 
 
-def pairwise_comparisons(folder, pipelines, model_name):
+def pairwise_comparisons(folder, pipelines, model_name, max_workers):
     def compare(pipeline_pair):
         pipeline_1, pipeline_2 = pipeline_pair
         print(f"\n--- Comparing {pipeline_1} vs {pipeline_2} ---")
@@ -292,7 +291,7 @@ def pairwise_comparisons(folder, pipelines, model_name):
         except Exception as e:
             print(f"Error comparing {pipeline_1} vs {pipeline_2}: {e}")
 
-    with ThreadPoolExecutor(max_workers=PAIRWISE_COMPARISON_WORKERS) as executor:
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for _ in executor.map(compare, combinations(pipelines, 2)):
             pass
 
@@ -314,7 +313,7 @@ if __name__ == "__main__":
             )
 
         print(f"Found {len(pipelines)} pipelines in folder '{folder}'.")
-        pairwise_comparisons(folder, pipelines, model_name)
+        pairwise_comparisons(folder, pipelines, model_name, int(args["--workers"]))
 
     elif args["highlighter"]:
         run_folder = args["<run_folder>"]
