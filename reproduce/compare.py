@@ -10,7 +10,7 @@ Usage:
 
 Options:
     --model=<model>      Model name for the judge [default: gpt-4.1-mini-batch]
-    --workers=<workers>  Concurrent pairwise comparisons [default: 8]
+    --workers=<workers>  Concurrent pairwise comparisons [default: 32]
 
 A `run_folder` is produced by `run_experiments.py` and it looks something like:
 `results/repliqa_3/HSBaseline-gpt-4.1-mini-gpt-4.1-mini`
