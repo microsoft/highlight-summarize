@@ -14,7 +14,7 @@ authors = [
 ]
 dependencies = [
     "azure-identity==1.23.0",
-    "datasets==3.6.0",
+    "datasets==5.0.1",
     "docopt==0.6.2",
     "python-dotenv==1.2.2",  # Fixed package name
     "evaluate==0.4.3",
